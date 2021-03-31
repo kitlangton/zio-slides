@@ -4,7 +4,9 @@ import zio.json.{DeriveJsonCodec, JsonCodec, JsonDecoder, JsonEncoder}
 
 import java.util.UUID
 
-case class SlideIndex(slide: Int, step: Int)
+case class SlideIndex(slide: Int, step: Int) {
+  def show: String = s"($slide,$step)"
+}
 
 object SlideIndex {
   implicit val codec: JsonCodec[SlideIndex] = DeriveJsonCodec.gen[SlideIndex]

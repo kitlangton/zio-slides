@@ -36,6 +36,17 @@ object Slides {
 
     div(
       "QUESTIONS",
+      position.fixed,
+      bottom("0"),
+      left("0"),
+      right("0"),
+      windowEvents.onKeyDown.filter(k => k.key == "q" && k.ctrlKey) --> { _ =>
+        val state = slideStateVar.now()
+        isAsking.update {
+          case Some(_) => None
+          case None    => Some(SlideIndex(state.slideIndex, state.stepIndex))
+        }
+      },
       border("1px solid #333"),
       padding("12px"),
       questionStateVar.signal --> { state =>
@@ -45,13 +56,6 @@ object Slides {
           case None           => slideIndexOverride.set(None)
         }
       },
-      button(
-        "ASK",
-        onClick --> { _ =>
-          val state = slideStateVar.now()
-          isAsking.set(Some(SlideIndex(state.slideIndex, state.stepIndex)))
-        }
-      ),
       child.maybe <-- isAsking.signal.split(_ => 1) { (_, index, _) =>
         div(
           input(
@@ -75,6 +79,8 @@ object Slides {
           div(
             color <-- questionStateVar.signal.map(qs => if (qs.activeQuestion.contains(id)) "green" else "white"),
             question.question,
+            nbsp,
+            span(question.slideIndex.show, opacity(0.5), fontStyle.italic, fontSize.medium),
             onClick --> { _ =>
               ws.sendOne(AdminCommand.ToggleQuestion(id))
             }
