@@ -6,12 +6,14 @@ import java.util.UUID
 
 case class QuestionState(
     questions: Vector[Question] = Vector.empty,
-    activeQuestion: Option[UUID] = None
+    activeQuestionId: Option[UUID] = None
 ) {
 
+  def activeQuestion: Option[Question] = questions.find(q => activeQuestionId.contains(q.id))
+
   def toggleQuestion(uuid: UUID): QuestionState =
-    if (activeQuestion.contains(uuid)) copy(activeQuestion = None)
-    else copy(activeQuestion = Some(uuid))
+    if (activeQuestionId.contains(uuid)) copy(activeQuestionId = None)
+    else copy(activeQuestionId = Some(uuid))
 
   def askQuestion(question: String, slideIndex: SlideIndex): QuestionState =
     copy(questions = questions.appended(Question(question, slideIndex)))

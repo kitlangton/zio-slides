@@ -16,6 +16,8 @@ trait SlideApp {
 }
 
 object SlideApp {
+  def receive(appCommand: AppCommand): ZIO[Has[SlideApp], Nothing, Unit] =
+    ZIO.accessM[Has[SlideApp]](_.get.receive(appCommand))
 
   val live: URLayer[Console with Clock, Has[SlideApp]] = {
     for {
@@ -36,7 +38,7 @@ object SlideApp {
       slideStateRef = slideRef,
       slideState = ZStream.fromEffect(slideRef.get) ++ ZStream.fromEffect(slideStream).flatten,
       questionStateRef = questionRef,
-      activeQuestion = questionStream.map(_.activeQuestion),
+      activeQuestion = questionStream.map(_.activeQuestionId),
       allQuestions = questionStream.map(_.questions)
     )
   }.toLayer

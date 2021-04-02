@@ -14,8 +14,10 @@ object Slides {
   val slideIndexOverride: Var[Option[SlideIndex]] = Var(None)
   val slideStateVar: Var[SlideState]              = Var(SlideState.empty)
   val questionStateVar: Var[QuestionState]        = Var(QuestionState.empty)
+  val isAskingVar                                 = Var(Option.empty[SlideIndex])
+  val isAdminVar                                  = Var(true)
 
-  def WebsocketStatus: Div = div(
+  def WebSocketStatus: Div = div(
     border("1px solid #333"),
     padding("12px"),
     child.text <-- ws.isConnecting.map { if (_) "CONNECTING" else "" },
@@ -30,65 +32,144 @@ object Slides {
     )
   )
 
-  def QuestionPanel: Div = {
-    val isAsking    = Var(Option.empty[SlideIndex])
-    val questionVar = Var("")
-
+  def BottomPanel: Div =
     div(
-      "QUESTIONS",
       position.fixed,
+      zIndex(2),
       bottom("0"),
       left("0"),
       right("0"),
       windowEvents.onKeyDown.filter(k => k.key == "q" && k.ctrlKey) --> { _ =>
         val state = slideStateVar.now()
-        isAsking.update {
+        isAskingVar.update {
           case Some(_) => None
           case None    => Some(SlideIndex(state.slideIndex, state.stepIndex))
         }
       },
-      border("1px solid #333"),
-      padding("12px"),
       questionStateVar.signal --> { state =>
-        val question = state.questions.find(q => state.activeQuestion.contains(q.id))
+        val question = state.questions.find(q => state.activeQuestionId.contains(q.id))
         question match {
           case Some(question) => slideIndexOverride.set(Some(question.slideIndex))
           case None           => slideIndexOverride.set(None)
         }
       },
-      child.maybe <-- isAsking.signal.split(_ => 1) { (_, index, _) =>
-        div(
-          input(
-            controlled(
-              value <-- questionVar,
-              onInput.mapToValue --> questionVar
-            )
-          ),
-          button(
-            "SEND",
-            onClick --> { _ =>
-              ws.sendOne(UserCommand.AskQuestion(questionVar.now(), index))
-              isAsking.set(None)
-              questionVar.set("")
-            }
-          )
-        )
-      },
-      div(
-        children <-- questionStateVar.signal.map(_.questions).split(_.id) { (id, question, _) =>
-          div(
-            color <-- questionStateVar.signal.map(qs => if (qs.activeQuestion.contains(id)) "green" else "white"),
-            question.question,
-            nbsp,
-            span(question.slideIndex.show, opacity(0.5), fontStyle.italic, fontSize.medium),
-            onClick --> { _ =>
-              ws.sendOne(AdminCommand.ToggleQuestion(id))
-            }
-          )
+      ActiveQuestion,
+      AskQuestion,
+      AdminPanel
+    )
+
+  private def AskQuestion = {
+    val questionVar = Var("")
+
+    def submitQuestion(): Unit =
+      isAskingVar.now().foreach { index =>
+        val question = questionVar.now()
+        if (question.nonEmpty) {
+          ws.sendOne(UserCommand.AskQuestion(question, index))
+          isAskingVar.set(None)
+          questionVar.set("")
         }
+      }
+
+    div(
+      panelStyles(isAskingVar.signal.map(_.isDefined)),
+      textAlign.left,
+      div(
+        display.flex,
+        fontStyle.italic,
+        fontSize.medium,
+        opacity(0.7),
+        "ASK A QUESTION",
+        paddingBottom("12px"),
+        div(flex("1")),
+        child.text <-- questionVar.signal.map { string =>
+          s"${string.length} / 240"
+        }
+      ),
+      textArea(
+        display.block,
+        height("100px"),
+        disabled <-- isAskingVar.signal.map(_.isEmpty),
+        inContext { el =>
+          isAskingVar.signal.changes.filter(_.isDefined) --> { _ =>
+            el.ref.focus()
+          }
+        },
+        onKeyDown.filter(k => k.key == "Enter" && k.metaKey).map(_.key) --> { _ => submitQuestion() },
+        onKeyDown.map(_.key).filter(_ == "Escape") --> { _ => isAskingVar.set(None) },
+        controlled(
+          value <-- questionVar,
+          onInput.mapToValue.map(_.take(240)) --> questionVar
+        )
+      ),
+      div(
+        display.flex,
+        button(
+          "CANCEL",
+          cls("cancel"),
+          onClick --> { _ => isAskingVar.set(None) }
+        ),
+        div(width("24px")),
+        button(
+          "SEND",
+          onClick --> { _ => submitQuestion() }
+        )
       )
     )
   }
+
+  private def ActiveQuestion =
+    div(
+      panelStyles(questionStateVar.signal.map(_.activeQuestion.isDefined)),
+      textAlign.left,
+      div(
+        div(
+          fontStyle.italic,
+          fontSize.medium,
+          opacity(0.7),
+          "QUESTION"
+        ),
+        div(
+          padding("12px 0"),
+          fontWeight.bold,
+          child.maybe <-- questionStateVar.signal.map(_.activeQuestion.map(_.question))
+        )
+      )
+    )
+
+  private def panelStyles(isVisible: Signal[Boolean] = Val(false)) =
+    Seq(
+      cls <-- isVisible.map { if (_) "panel-visible" else "panel-hidden" },
+      height <-- isVisible.map { if (_) "auto" else "0px" },
+      padding <-- isVisible.map { if (_) "24px" else "0px" },
+      background("black"),
+      borderTop("1px solid #333"),
+      borderTopWidth <-- isVisible.map { if (_) "1px" else "0px" }
+    )
+
+  private def AdminPanel: Div =
+    div(
+      display <-- isAdminVar.signal.map(if (_) "block" else "none"),
+      AllQuestions
+    )
+
+  private def AllQuestions: Div =
+    div(
+      panelStyles(isAdminVar.signal),
+      children <-- questionStateVar.signal.map(_.questions).split(_.id) { (id, question, _) =>
+        div(
+          color <-- questionStateVar.signal.map(qs => if (qs.activeQuestionId.contains(id)) "green" else "white"),
+          textAlign.left,
+          fontSize.medium,
+          cursor.pointer,
+          margin("8px 0px"),
+          question.question,
+          nbsp,
+          span(question.slideIndex.show, opacity(0.5), fontStyle.italic, fontSize.medium),
+          onClick --> { _ => ws.sendOne(AdminCommand.ToggleQuestion(id)) }
+        )
+      }
+    )
 
   def view: Div = div(
     ws.connect,
@@ -99,28 +180,44 @@ object Slides {
         case ServerCommand.SendAllQuestions(questions) =>
           questionStateVar.update(_.copy(questions = questions))
         case ServerCommand.SendActiveQuestion(activeQuestion) =>
-          questionStateVar.update(_.copy(activeQuestion = activeQuestion))
+          questionStateVar.update(_.copy(activeQuestionId = activeQuestion))
       }
     },
-    WebsocketStatus,
-    QuestionPanel,
+    WebSocketStatus,
+    BottomPanel,
     textAlign.center,
-    pre("zio-slides"),
-    windowEvents.onKeyDown.map(_.key) --> {
-      case "ArrowRight" =>
-        slideStateVar.update(_.nextSlide)
-        ws.sendOne(AdminCommand.NextSlide)
-      case "ArrowLeft" =>
-        slideStateVar.update(_.prevSlide)
-        ws.sendOne(AdminCommand.PrevSlide)
-      case "ArrowDown" =>
-        slideStateVar.update(_.nextStep)
-        ws.sendOne(AdminCommand.NextStep)
-      case "ArrowUp" =>
-        slideStateVar.update(_.prevStep)
-        ws.sendOne(AdminCommand.PrevStep)
-    },
-    renderSlides
+    div(
+      position.relative,
+      position.fixed,
+      top("0"),
+      bottom("0"),
+      left("0"),
+      right("0"),
+      background("#111"),
+      cls <-- isAskingVar.signal
+        .map(_.isDefined)
+        .combineWithFn(questionStateVar.signal.map(_.activeQuestion.isDefined))(_ || _)
+        .map { if (_) "slide-app-shrink" else "slide-app" },
+      pre("zymposium"),
+      windowEvents.onKeyDown.map(_.key) --> {
+        case "‡" =>
+          isAdminVar.update(!_)
+        case "ArrowRight" =>
+          slideStateVar.update(_.nextSlide)
+          ws.sendOne(AdminCommand.NextSlide)
+        case "ArrowLeft" =>
+          slideStateVar.update(_.prevSlide)
+          ws.sendOne(AdminCommand.PrevSlide)
+        case "ArrowDown" =>
+          slideStateVar.update(_.nextStep)
+          ws.sendOne(AdminCommand.NextStep)
+        case "ArrowUp" =>
+          slideStateVar.update(_.prevStep)
+          ws.sendOne(AdminCommand.PrevStep)
+        case _ => ()
+      },
+      renderSlides
+    )
   )
 
   val $slideState: Signal[SlideState] = slideStateVar.signal.combineWithFn(slideIndexOverride) {

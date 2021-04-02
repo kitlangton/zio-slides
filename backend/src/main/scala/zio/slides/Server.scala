@@ -21,6 +21,10 @@ import zio.stream.interop.fs2z.zStreamSyntax
 
 import java.util.UUID
 
+/** TODO: Identity Management
+  *   - Authorization
+  *   - GitHub OAuth
+  */
 object Server extends App {
   type AppEnv     = ZEnv with Has[SlideApp]
   type AppTask[A] = RIO[AppEnv, A]
@@ -31,10 +35,10 @@ object Server extends App {
   private val routes = HttpRoutes.of[AppTask] {
     case GET -> Root =>
       Ok("Hello")
+
     case GET -> Root / "ws" =>
       val id = UUID.randomUUID().toString
 
-//
       val toClient: fs2.Stream[AppTask, WebSocketFrame] =
         ZStream
           .mergeAllUnbounded()(
@@ -54,19 +58,24 @@ object Server extends App {
           )
           .tap(r => UIO(println(s"SENDING ${r}")))
           .toFs2Stream
-//
+
       val fromClient: Pipe[AppTask, WebSocketFrame, Unit] = _.evalMap {
         case Text(t, _) =>
           putStrLn(s"RECEIVED: $t") *>
             (t.fromJson[AppCommand] match {
               case Left(error)    => putStrErr(s"DECODING ERROR $error")
-              case Right(command) => ZIO.accessM[Has[SlideApp]](_.get.receive(command))
+              case Right(command) => SlideApp.receive(command)
             })
         case f => putStrLn(s"Unknown type: $f")
       }
-//
+
       putStrLn(s"CONNECTED $id") *>
-        WebSocketBuilder[AppTask].build(toClient, fromClient, onClose = putStrLn(s"GOODBYE $id"))
+        WebSocketBuilder[AppTask]
+          .build(
+            send = toClient,
+            receive = fromClient,
+            onClose = putStrLn(s"GOODBYE $id")
+          )
 
   }
 
@@ -78,7 +87,7 @@ object Server extends App {
           port <- system.envOrElse("PORT", "8088").map(_.toInt)
           _    <- putStrLn("PORT: " + port.toString)
           _ <- BlazeServerBuilder[AppTask](runtime.platform.executor.asEC)
-            .bindHttp(port, "0.0.0.0")
+            .bindHttp(8088, "0.0.0.0")
             .withHttpApp(
               Router[AppTask]("/" -> CORS(routes)).orNotFound
             )

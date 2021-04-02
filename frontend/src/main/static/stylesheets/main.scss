@@ -24,13 +24,42 @@ html {
  */
 
 body {
-//     font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-    font-family: "Source Code Pro", BlinkMacSystemFont, sans-serif;
-    font-size: 28px;
-    background: black;
-    color: white;
-    box-sizing: border-box;
-    margin: 40px;
+  font-family: "Source Code Pro", BlinkMacSystemFont, sans-serif;
+  font-size: 28px;
+  background: #333 !important;
+  color: white;
+  box-sizing: border-box;
+  margin: 40px;
+}
+
+
+button {
+cursor: pointer;
+border: 1px solid #555;
+border-radius: 4px;
+color: rgba(255,255,255,0.9);
+font-size: 18px !important;
+outline: none;
+background: #223;
+width: 100%;
+font-weight: bold;
+
+&.cancel {
+background: #222;
+}
+}
+
+textarea {
+background: #222;
+margin-bottom: 12px !important;
+border: 1px solid #333;
+border-radius: 4px;
+padding: 8px;
+outline: none;
+color: white;
+width: 100%;
+resize: none;
+font-size: 22px !important;
 }
 
 form {
@@ -46,10 +75,40 @@ form {
    position: relative;
 }
 
+
+.panel-visible {
+   transition: all 0.5s 0.0s;
+   opacity: 1;
+   position: relative;
+   transform: translateY(0px);
+}
+
+.panel-hidden {
+   transition: all 0.3s 0.0s;
+   opacity: 0;
+   position: relative;
+   transform: translateY(50px);
+}
+
 .slide-next, .slide-previous {
     opacity: 0;
     transform: rotateY(90deg);
 }
+
+.slide-app {
+    transition: all 0.4s;
+    border-radius: 0px;
+    border: 1px solid #000;
+    margin: 0px;
+}
+
+.slide-app-shrink {
+    transition: all 0.8s;
+    border-radius: 8px;
+    border: 1px solid #555;
+    margin: 24px;
+}
+
 
 .hidden {
     transition: all 0.4s;

@@ -10,12 +10,15 @@ val sharedSettings = Seq(
   addCompilerPlugin("com.olegpy"    %% "better-monadic-for" % "0.3.1"),
   libraryDependencies ++= Seq(
 //    "com.propensive" %%% "magnolia"      % "0.17.0",
-    "dev.zio"      %%% "zio"           % zioVersion,
-    "dev.zio"      %%% "zio-macros"    % zioVersion,
-    "dev.zio"      %%% "zio-json"      % "0.1.3",
-    "org.scala-lang" % "scala-reflect" % scalaVersion.value % Provided
+    "dev.zio"      %%% "zio"               % zioVersion,
+    "dev.zio"      %%% "zio-test"          % zioVersion         % Test,
+    "dev.zio"      %%% "zio-test-magnolia" % zioVersion         % Test,
+    "dev.zio"      %%% "zio-macros"        % zioVersion,
+    "dev.zio"      %%% "zio-json"          % "0.1.3",
+    "org.scala-lang" % "scala-reflect"     % scalaVersion.value % Provided
   ),
-  scalaVersion := "2.13.5"
+  scalaVersion := "2.13.5",
+  testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework")
 )
 
 scalacOptions ++= Seq("-Ymacro-annotations")
