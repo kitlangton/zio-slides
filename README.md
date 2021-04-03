@@ -3,7 +3,8 @@ Example repo for "Deriving your Frontend" tutorial. [(Live Demo)](https://formul
 
 ## Running Locally
 
-1. `sbt ~fastLinkJS` in another tab.
-2. `yarn install`
-3. `yarn exec vite`
-4. open `http://localhost:3000`
+1. `sbt ~frontend/fastLinkJS` in another tab.
+2. `sbt backend/run`in another tab.
+3. `yarn install`
+4. `yarn exec vite`
+5. open `http://localhost:3000`
