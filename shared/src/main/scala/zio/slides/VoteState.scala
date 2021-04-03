@@ -1,5 +1,7 @@
 package zio.slides
 
+import zio.Chunk
+import zio.json.{DeriveJsonCodec, JsonCodec}
 import zio.slides.VoteState.{CastVoteId, Topic, UserId, Vote, VoteMap}
 
 // user A
@@ -11,7 +13,9 @@ import zio.slides.VoteState.{CastVoteId, Topic, UserId, Vote, VoteMap}
 //       yes
 //       no
 
-case class VoteState private (map: VoteMap) {
+case class VoteState private (map: VoteMap) { self =>
+  def processUpdates(votes: Chunk[CastVoteId]): VoteState =
+    votes.foldLeft(self)(_.processUpdate(_))
 
   def processUpdate(vote: CastVoteId): VoteState =
     VoteState {
@@ -22,7 +26,7 @@ case class VoteState private (map: VoteMap) {
     }
 
   def voteTotals(topic: Topic): Map[Vote, Int] =
-    map(topic).toList.groupBy(_._2).view.mapValues(_.length).toMap
+    map.getOrElse(topic, Map.empty).toList.groupBy(_._2).view.mapValues(_.length).toMap
 }
 
 object VoteState {
@@ -34,9 +38,27 @@ object VoteState {
   case class CastVote(topic: Topic, vote: Vote)
   case class CastVoteId(id: UserId, topic: Topic, vote: Vote)
 
-  case class Topic(string: String)  extends AnyVal
+  object CastVoteId {
+    implicit val codec: JsonCodec[CastVoteId] = DeriveJsonCodec.gen[CastVoteId]
+  }
+
+  case class Topic(string: String) extends AnyVal
+
+  object Topic {
+    implicit val codec: JsonCodec[Topic] = DeriveJsonCodec.gen[Topic]
+  }
+
   case class UserId(string: String) extends AnyVal
-  case class Vote(string: String)   extends AnyVal
+
+  object UserId {
+    implicit val codec: JsonCodec[UserId] = DeriveJsonCodec.gen[UserId]
+  }
+
+  case class Vote(string: String) extends AnyVal
+
+  object Vote {
+    implicit val codec: JsonCodec[Vote] = DeriveJsonCodec.gen[Vote]
+  }
 
   type VoteMap = Map[Topic, Map[UserId, Vote]]
 }

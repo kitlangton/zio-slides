@@ -1,5 +1,6 @@
 package zio.slides
 
+import zio.Chunk
 import zio.json._
 
 import java.util.UUID
@@ -10,9 +11,12 @@ object ServerCommand {
   case class SendSlideState(slideState: SlideState)           extends ServerCommand
   case class SendAllQuestions(questions: Vector[Question])    extends ServerCommand
   case class SendActiveQuestion(activeQuestion: Option[UUID]) extends ServerCommand
+  case class SendVotes(votes: Chunk[VoteState.CastVoteId])    extends ServerCommand
+  case class SendUserId(id: VoteState.UserId)                 extends ServerCommand
 
   implicit val uuidCodec                       = JsonCodec(JsonEncoder.uuid, JsonDecoder.uuid)
   implicit val codec: JsonCodec[ServerCommand] = DeriveJsonCodec.gen[ServerCommand]
+
 }
 
 sealed trait AppCommand
@@ -35,7 +39,8 @@ object AdminCommand {
 sealed trait UserCommand extends AppCommand
 
 object UserCommand {
-  case class AskQuestion(question: String, slideIndex: SlideIndex) extends UserCommand
+  case class AskQuestion(question: String, slideIndex: SlideIndex)  extends UserCommand
+  case class SendVote(topic: VoteState.Topic, vote: VoteState.Vote) extends UserCommand
 }
 
 case class SlideState(slideIndex: Int, slideStepMap: Map[Int, Int]) {

@@ -8,9 +8,9 @@ import zio.test.magnolia.DeriveGen
 
 object VoteStateSpec extends DefaultRunnableSpec {
 
-  val voteGen: Gen[Random with Sized, Vote]            = Gen.fromIterable(List.tabulate(3)(n => Vote(s"vote-${n + 1}")))
-  val topicGen: Gen[Random with Sized, Topic]          = Gen.fromIterable(List.tabulate(3)(n => Topic(s"topic-${n + 1}")))
-  val userIdGen: Gen[Random with Sized, UserId]        = Gen.fromIterable(List.tabulate(20)(n => UserId(s"user-id-${n + 1}")))
+  val voteGen: Gen[Random with Sized, Vote]            = Gen.elements(List.tabulate(3)(n => Vote(s"vote-${n + 1}")): _*)
+  val topicGen: Gen[Random with Sized, Topic]          = Gen.elements(List.tabulate(3)(n => Topic(s"topic-${n + 1}")): _*)
+  val userIdGen: Gen[Random with Sized, UserId]        = Gen.elements(List.tabulate(20)(n => UserId(s"user-id-${n + 1}")): _*)
   val castVotesGen: Gen[Random with Sized, CastVoteId] = Gen.zipN(userIdGen, topicGen, voteGen)(CastVoteId)
 
   override def spec = suite("VoteState")(

@@ -1,4 +1,4 @@
-name := "formula"
+name := "zio-slides"
 
 version := "0.1"
 

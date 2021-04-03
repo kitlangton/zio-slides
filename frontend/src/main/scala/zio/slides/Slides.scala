@@ -171,7 +171,66 @@ object Slides {
       }
     )
 
-  def view: Div = div(
+  val voteStateVar = Var(VoteState.empty)
+
+  def view = {
+    val topic = VoteState.Topic("Favorite Colors")
+
+    val options = List(
+      "Red",
+      "Blue",
+      "Green"
+    )
+
+    div(
+      child.text <-- userId.signal.map(_.toString),
+      ws.connect,
+      voteBus.events --> { vote =>
+//        voteBus.events.debounce(500) --> { vote =>
+        println(s"SENDING VOTE $vote ")
+        ws.sendOne(vote)
+      },
+      ws.received --> { command =>
+        println(s"RECEVIED $command")
+        command match {
+          case ServerCommand.SendSlideState(slideState) =>
+            slideStateVar.set(slideState)
+          case ServerCommand.SendAllQuestions(questions) =>
+            questionStateVar.update(_.copy(questions = questions))
+          case ServerCommand.SendActiveQuestion(activeQuestion) =>
+            questionStateVar.update(_.copy(activeQuestionId = activeQuestion))
+          case ServerCommand.SendVotes(votes) =>
+            voteStateVar.update(_.processUpdates(votes))
+          case ServerCommand.SendUserId(id) =>
+            userId.set(id)
+        }
+      },
+      div("VOTES"),
+//      child.text <-- voteStateVar.signal.map(_.toString),
+      options.map { string =>
+        VoteView(topic, VoteState.Vote(string))
+      }
+    )
+  }
+
+  lazy val userId = Var(VoteState.UserId("not-connected"))
+
+  lazy val voteBus: EventBus[UserCommand.SendVote] = new EventBus
+
+  private def VoteView(topic: VoteState.Topic, vote: VoteState.Vote) = {
+    val $totalVotes = voteStateVar.signal.map(_.voteTotals(topic).getOrElse(vote, 0))
+    div(
+      vote.string,
+      " ",
+      child.text <-- $totalVotes,
+      onMouseEnter --> { _ =>
+        voteBus.emit(UserCommand.SendVote(topic, vote))
+        voteStateVar.update(_.processUpdate(VoteState.CastVoteId(userId.now(), topic, vote)))
+      }
+    )
+  }
+
+  def view2: Div = div(
     ws.connect,
     ws.received --> { command =>
       command match {
@@ -181,6 +240,10 @@ object Slides {
           questionStateVar.update(_.copy(questions = questions))
         case ServerCommand.SendActiveQuestion(activeQuestion) =>
           questionStateVar.update(_.copy(activeQuestionId = activeQuestion))
+        case ServerCommand.SendVotes(votes) =>
+          voteStateVar.update(_.processUpdates(votes))
+        case ServerCommand.SendUserId(id) =>
+          userId.set(id)
       }
     },
     WebSocketStatus,

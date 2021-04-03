@@ -16,6 +16,7 @@ import zio.duration.durationInt
 import zio.interop.catz._
 import zio.json._
 import zio.magic.ZioProvideMagicOps
+import zio.slides.VoteState.UserId
 import zio.stream.ZStream
 import zio.stream.interop.fs2z.zStreamSyntax
 
@@ -37,26 +38,22 @@ object Server extends App {
       Ok("Hello")
 
     case GET -> Root / "ws" =>
-      val id = UUID.randomUUID().toString
+      val id = UserId(UUID.randomUUID().toString)
+
+      //
 
       val toClient: fs2.Stream[AppTask, WebSocketFrame] =
         ZStream
           .mergeAllUnbounded()(
-            ZStream
-              .accessStream[Has[SlideApp]](_.get.slideState)
-              .map[ServerCommand](ServerCommand.SendSlideState)
+            SlideApp.slideStateStream.map[ServerCommand](ServerCommand.SendSlideState).map(s => Text(s.toJson)),
+            SlideApp.questionsStream.map[ServerCommand](ServerCommand.SendAllQuestions).map(s => Text(s.toJson)),
+            SlideApp.activeQuestionStream.map[ServerCommand](ServerCommand.SendActiveQuestion).map(s => Text(s.toJson)),
+            ZStream.succeed[ServerCommand](ServerCommand.SendUserId(id)).map(s => Text(s.toJson)),
+            SlideApp.votes
+              .map[ServerCommand](ServerCommand.SendVotes)
               .map(s => Text(s.toJson)),
-            ZStream
-              .accessStream[Has[SlideApp]](_.get.allQuestions)
-              .map[ServerCommand](ServerCommand.SendAllQuestions)
-              .map { s => Text(s.toJson) },
-            ZStream
-              .accessStream[Has[SlideApp]](_.get.activeQuestion)
-              .map[ServerCommand](ServerCommand.SendActiveQuestion)
-              .map { s => Text(s.toJson) },
             ZStream.fromSchedule(Schedule.spaced(20.seconds).as(WebSocketFrame.Ping()))
           )
-          .tap(r => UIO(println(s"SENDING ${r}")))
           .toFs2Stream
 
       val fromClient: Pipe[AppTask, WebSocketFrame, Unit] = _.evalMap {
@@ -64,7 +61,7 @@ object Server extends App {
           putStrLn(s"RECEIVED: $t") *>
             (t.fromJson[AppCommand] match {
               case Left(error)    => putStrErr(s"DECODING ERROR $error")
-              case Right(command) => SlideApp.receive(command)
+              case Right(command) => SlideApp.receive(id, command)
             })
         case f => putStrLn(s"Unknown type: $f")
       }
