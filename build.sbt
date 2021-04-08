@@ -25,6 +25,7 @@ scalacOptions ++= Seq("-Ymacro-annotations")
 
 lazy val backend = project
   .in(file("backend"))
+  .enablePlugins(JavaAppPackaging)
   .settings(
     sharedSettings,
     libraryDependencies ++= Seq(
