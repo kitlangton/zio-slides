@@ -84,7 +84,7 @@ object Server extends App {
           port <- system.envOrElse("PORT", "8088").map(_.toInt)
           _    <- putStrLn("PORT: " + port.toString)
           _ <- BlazeServerBuilder[AppTask](runtime.platform.executor.asEC)
-            .bindHttp(8088, "0.0.0.0")
+            .bindHttp(port, "0.0.0.0")
             .withHttpApp(
               Router[AppTask]("/" -> CORS(routes)).orNotFound
             )

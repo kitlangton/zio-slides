@@ -7,7 +7,7 @@ import io.laminext.websocket.zio._
 object Slides {
   val ws: WebSocket[ServerCommand, AppCommand] =
     WebSocket
-      .url("ws://localhost:8088/ws")
+      .url(Config.webSocketsUrl)
       .json[ServerCommand, AppCommand]
       .build(reconnectRetries = Int.MaxValue)
 
