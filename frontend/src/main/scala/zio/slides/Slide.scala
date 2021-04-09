@@ -1,6 +1,7 @@
 package zio.slides
 
 import com.raquo.laminar.api.L._
+import zio.slides.Slides.VotesView
 
 trait Slide {
   def render($step: Signal[Int]): HtmlElement
@@ -50,5 +51,14 @@ object Slide {
       )
   }
 
-  val exampleSlides: Vector[Slide] = Vector(Slide_1, Slide_2, Slide_3)
+  object Slide_4 extends Slide {
+    override def render($step: Signal[Int]): HtmlElement =
+      div(
+        h1("Today's Topics"),
+        p("Hover over a topic to vote!"),
+        VotesView()
+      )
+  }
+
+  val exampleSlides: Vector[Slide] = Vector(Slide_1, Slide_2, Slide_3, Slide_4)
 }

@@ -2,19 +2,20 @@ name := "zio-slides"
 
 version := "0.1"
 
-val zioVersion    = "1.0.5"
+val zioVersion    = "1.0.5+9-ca934a76-SNAPSHOT"
 val http4sVersion = "0.21.21"
 
 val sharedSettings = Seq(
   addCompilerPlugin("org.typelevel" %% "kind-projector"     % "0.11.3" cross CrossVersion.full),
   addCompilerPlugin("com.olegpy"    %% "better-monadic-for" % "0.3.1"),
+  resolvers += "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots",
   libraryDependencies ++= Seq(
 //    "com.propensive" %%% "magnolia"      % "0.17.0",
     "dev.zio"      %%% "zio"               % zioVersion,
     "dev.zio"      %%% "zio-test"          % zioVersion         % Test,
     "dev.zio"      %%% "zio-test-magnolia" % zioVersion         % Test,
     "dev.zio"      %%% "zio-macros"        % zioVersion,
-    "dev.zio"      %%% "zio-json"          % "0.1.3",
+    "dev.zio"      %%% "zio-json"          % "0.1.4",
     "org.scala-lang" % "scala-reflect"     % scalaVersion.value % Provided
   ),
   scalaVersion := "2.13.5",
@@ -22,6 +23,8 @@ val sharedSettings = Seq(
 )
 
 scalacOptions ++= Seq("-Ymacro-annotations")
+
+resolvers += "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots"
 
 lazy val backend = project
   .in(file("backend"))

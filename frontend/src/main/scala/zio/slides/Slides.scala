@@ -4,6 +4,8 @@ import com.raquo.laminar.api.L._
 import io.laminext.websocket._
 import io.laminext.websocket.zio._
 
+import scala.util.Try
+
 object Slides {
   val ws: WebSocket[ServerCommand, AppCommand] =
     WebSocket
@@ -15,7 +17,7 @@ object Slides {
   val slideStateVar: Var[SlideState]              = Var(SlideState.empty)
   val questionStateVar: Var[QuestionState]        = Var(QuestionState.empty)
   val isAskingVar                                 = Var(Option.empty[SlideIndex])
-  val isAdminVar                                  = Var(true)
+  val isAdminVar                                  = Var(false)
 
   def WebSocketStatus: Div = div(
     border("1px solid #333"),
@@ -171,67 +173,82 @@ object Slides {
       }
     )
 
-  val voteStateVar = Var(VoteState.empty)
+  lazy val voteStateVar = Var(VoteState.empty)
 
-  def view = {
-    val topic = VoteState.Topic("Favorite Colors")
+  lazy val exampleOptions: List[String] = List(
+    "Variance (Pros and Contras)",
+    "Effect Systems from Scratch",
+    "Fancy IntelliJ Tips",
+    "Something Else..."
+  )
 
-    val options = List(
-      "Red",
-      "Blue",
-      "Green"
-    )
+  lazy val exampleTopic: VoteState.Topic = VoteState.Topic("Scala-Topic")
 
+  def VotesView(topic: VoteState.Topic = exampleTopic, options: List[String] = exampleOptions): Div =
     div(
-      child.text <-- userId.signal.map(_.toString),
-      ws.connect,
-      voteBus.events --> { vote =>
-//        voteBus.events.debounce(500) --> { vote =>
-        println(s"SENDING VOTE $vote ")
-        ws.sendOne(vote)
-      },
-      ws.received --> { command =>
-        println(s"RECEVIED $command")
-        command match {
-          case ServerCommand.SendSlideState(slideState) =>
-            slideStateVar.set(slideState)
-          case ServerCommand.SendAllQuestions(questions) =>
-            questionStateVar.update(_.copy(questions = questions))
-          case ServerCommand.SendActiveQuestion(activeQuestion) =>
-            questionStateVar.update(_.copy(activeQuestionId = activeQuestion))
-          case ServerCommand.SendVotes(votes) =>
-            voteStateVar.update(_.processUpdates(votes))
-          case ServerCommand.SendUserId(id) =>
-            userId.set(id)
-        }
-      },
-      div("VOTES"),
-//      child.text <-- voteStateVar.signal.map(_.toString),
       options.map { string =>
         VoteView(topic, VoteState.Vote(string))
       }
     )
-  }
 
-  lazy val userId = Var(VoteState.UserId("not-connected"))
+  lazy val userIdVar: Var[Option[VoteState.UserId]] = Var(Option.empty[VoteState.UserId])
 
   lazy val voteBus: EventBus[UserCommand.SendVote] = new EventBus
 
   private def VoteView(topic: VoteState.Topic, vote: VoteState.Vote) = {
-    val $totalVotes = voteStateVar.signal.map(_.voteTotals(topic).getOrElse(vote, 0))
+    val $totalVotes        = voteStateVar.signal.map(_.voteTotals(topic).getOrElse(vote, 0))
+    val $numberOfCastVotes = voteStateVar.signal.map(_.voteTotals(topic).values.sum)
+
+    val $votePercentage = $totalVotes.combineWithFn($numberOfCastVotes) { (votes, all) =>
+      if (all == 0) 0.0
+      else
+        Try {
+          votes.toDouble / all.toDouble
+        }.getOrElse(0.0)
+    }
+
     div(
-      vote.string,
-      " ",
-      child.text <-- $totalVotes,
+//      background("#223"),
+      padding("8px"),
+      border("1px solid #444"),
+      position.relative,
+      background("#223"),
+      div(
+        cls("vote-vote"),
+        position.absolute,
+        zIndex(1),
+        left("0"),
+        top("0"),
+        right("0"),
+        width <-- $votePercentage.map(d => s"${d * 100}%"),
+        bottom("0"),
+        background("blue")
+      ),
+      div(
+        position.relative,
+        vote.string,
+        " ",
+        span(
+          opacity(0.6),
+          child.text <-- $totalVotes
+        ),
+        zIndex(2)
+      ),
       onMouseEnter --> { _ =>
         voteBus.emit(UserCommand.SendVote(topic, vote))
-        voteStateVar.update(_.processUpdate(VoteState.CastVoteId(userId.now(), topic, vote)))
+        userIdVar.now().foreach { userId =>
+          voteStateVar.update(_.processUpdate(VoteState.CastVoteId(userId, topic, vote)))
+        }
       }
     )
   }
 
-  def view2: Div = div(
+  def view: Div = div(
     ws.connect,
+    voteBus.events.debounce(500) --> { vote =>
+      println(s"SENDING VOTE $vote ")
+      ws.sendOne(vote)
+    },
     ws.received --> { command =>
       command match {
         case ServerCommand.SendSlideState(slideState) =>
@@ -241,9 +258,10 @@ object Slides {
         case ServerCommand.SendActiveQuestion(activeQuestion) =>
           questionStateVar.update(_.copy(activeQuestionId = activeQuestion))
         case ServerCommand.SendVotes(votes) =>
-          voteStateVar.update(_.processUpdates(votes))
+          println(s"RECEIVED VOTES ${votes}")
+          voteStateVar.update(_.processUpdates(votes.filterNot(v => userIdVar.now().contains(v.id))))
         case ServerCommand.SendUserId(id) =>
-          userId.set(id)
+          userIdVar.set(Some(id))
       }
     },
     WebSocketStatus,
@@ -261,10 +279,12 @@ object Slides {
         .map(_.isDefined)
         .combineWithFn(questionStateVar.signal.map(_.activeQuestion.isDefined))(_ || _)
         .map { if (_) "slide-app-shrink" else "slide-app" },
-      pre("zymposium"),
+      pre("Scala Café"),
       windowEvents.onKeyDown.map(_.key) --> {
         case "‡" =>
           isAdminVar.update(!_)
+        case _ if !isAdminVar.now() =>
+          ()
         case "ArrowRight" =>
           slideStateVar.update(_.nextSlide)
           ws.sendOne(AdminCommand.NextSlide)
