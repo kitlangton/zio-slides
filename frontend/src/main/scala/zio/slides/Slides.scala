@@ -4,6 +4,7 @@ import com.raquo.laminar.api.L._
 import io.laminext.websocket._
 import io.laminext.websocket.zio._
 
+import scala.concurrent.duration.DurationInt
 import scala.util.Try
 
 object Slides {
@@ -11,7 +12,7 @@ object Slides {
     WebSocket
       .url(Config.webSocketsUrl)
       .json[ServerCommand, ClientCommand]
-      .build(reconnectRetries = Int.MaxValue, bufferWhenDisconnected = false)
+      .build(reconnectRetries = Int.MaxValue, reconnectDelay = 20.seconds)
 
   val slideIndexOverride: Var[Option[SlideIndex]] = Var(None)
   val slideStateVar: Var[SlideState]              = Var(SlideState.empty)
@@ -49,7 +50,6 @@ object Slides {
           case None           => slideIndexOverride.set(None)
         }
       },
-      WebSocketInfo,
       ActiveQuestion,
       AskQuestion,
       AdminPanel
@@ -255,6 +255,7 @@ object Slides {
       ws.sendOne(UserCommand.ConnectionPlease())
     },
     ws.received --> { command =>
+      println(s"RECEIVED COMMAND: $command")
       command match {
         case ServerCommand.SendSlideState(slideState) =>
           slideStateVar.set(slideState)
@@ -283,7 +284,7 @@ object Slides {
         .combineWithFn(questionStateVar.signal.map(_.activeQuestion.isDefined))(_ || _)
         .map { if (_) "slide-app-shrink" else "slide-app" },
       pre(
-        "Symposium — ",
+        "Zymposium — ",
         child.text <-- populationStatsVar.signal.map(_.connectedUsers.toString),
         onDblClick --> { _ =>
           val state = slideStateVar.now()

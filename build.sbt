@@ -17,7 +17,7 @@ val sharedSettings = Seq(
   scalaVersion := "2.13.5"
 )
 
-scalacOptions ++= Seq("-Ymacro-annotations")
+scalacOptions ++= Seq("-Ymacro-annotations", "-Xfatal-warnings")
 
 resolvers += "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots"
 

@@ -81,6 +81,8 @@ case class SlideAppLive(
 
   private def receive(id: UserId, userCommand: UserCommand): UIO[Unit] =
     userCommand match {
+      case UserCommand.ConnectionPlease() =>
+        ZIO.unit
       case UserCommand.AskQuestion(question, slideIndex) =>
         questionStateRef.update(qs => UIO(qs.askQuestion(question, slideIndex)))
       case UserCommand.SendVote(topic, vote) =>
