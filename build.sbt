@@ -10,6 +10,7 @@ val sharedSettings = Seq(
   addCompilerPlugin("com.olegpy"    %% "better-monadic-for" % "0.3.1"),
   resolvers += "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots",
   libraryDependencies ++= Seq(
+    "dev.zio"      %%% "zio"           % zioVersion,
     "dev.zio"      %%% "zio-json"      % "0.1.4",
     "org.scala-lang" % "scala-reflect" % scalaVersion.value % Provided
   ),
@@ -30,8 +31,7 @@ lazy val backend = project
       "dev.zio"              %% "zio-interop-cats"    % "2.4.0.0",
       "org.http4s"           %% "http4s-dsl"          % http4sVersion,
       "org.http4s"           %% "http4s-blaze-server" % http4sVersion,
-      "org.http4s"           %% "http4s-circe"        % http4sVersion,
-      "dev.zio"              %% "zio"                 % zioVersion
+      "org.http4s"           %% "http4s-circe"        % http4sVersion
     )
   )
   .dependsOn(shared)
