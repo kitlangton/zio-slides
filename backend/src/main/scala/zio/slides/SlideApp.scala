@@ -2,7 +2,7 @@ package zio.slides
 
 import zio._
 import zio.clock.Clock
-import zio.console.{Console, putStrLn}
+import zio.console.Console
 import zio.duration.durationInt
 import zio.slides.VoteState.{CastVoteId, UserId}
 import zio.stream._
@@ -18,8 +18,12 @@ trait SlideApp {
   def slideStateStream: UStream[SlideState]
   def questionStateStream: UStream[QuestionState]
   def voteStream: UStream[Chunk[CastVoteId]]
+  def populationStatsStream: UStream[PopulationStats]
 
   def receive(id: UserId, appCommand: ClientCommand): UIO[Unit]
+
+  def userJoined: UIO[Unit]
+  def userLeft: UIO[Unit]
 }
 
 object SlideApp {
@@ -36,8 +40,17 @@ object SlideApp {
   def voteStream: ZStream[Has[SlideApp], Nothing, Chunk[CastVoteId]] =
     ZStream.accessStream[Has[SlideApp]](_.get.voteStream)
 
+  def populationStatsStream: ZStream[Has[SlideApp], Nothing, PopulationStats] =
+    ZStream.accessStream[Has[SlideApp]](_.get.populationStatsStream)
+
   def receive(id: UserId, appCommand: ClientCommand): ZIO[Has[SlideApp], Nothing, Unit] =
     ZIO.accessM[Has[SlideApp]](_.get.receive(id, appCommand))
+
+  def userJoined: ZIO[Has[SlideApp], Nothing, Unit] =
+    ZIO.accessM[Has[SlideApp]](_.get.userJoined)
+
+  def userLeft: ZIO[Has[SlideApp], Nothing, Unit] =
+    ZIO.accessM[Has[SlideApp]](_.get.userLeft)
 }
 
 case class SlideAppLive(
@@ -46,7 +59,9 @@ case class SlideAppLive(
     questionStateRef: RefM[QuestionState],
     questionStateStream: UStream[QuestionState],
     voteQueue: Queue[CastVoteId],
-    voteStream: UStream[Chunk[CastVoteId]]
+    voteStream: UStream[Chunk[CastVoteId]],
+    populationStatsRef: RefM[PopulationStats],
+    populationStatsStream: UStream[PopulationStats]
 ) extends SlideApp {
 
   override def receive(id: UserId, appCommand: ClientCommand): UIO[Unit] = appCommand match {
@@ -71,13 +86,30 @@ case class SlideAppLive(
       case UserCommand.SendVote(topic, vote) =>
         voteQueue.offer(CastVoteId(id, topic, vote)).unit
     }
+
+  override def userLeft: UIO[Unit] =
+    populationStatsRef.update(stats => UIO(stats.removeOne))
+
+  override def userJoined: UIO[Unit] =
+    populationStatsRef.update(stats => UIO(stats.addOne))
 }
+
+/** SubscriptionRef
+  * val ref = Ref[Int]
+  * ref.set(20)
+  * ref.set(10)
+  * ref.set(0)
+  * ref.get
+  *
+  * subscriptionRef.changes : UStream[Int]
+  */
 
 object SlideAppLive {
   val layer: URLayer[Console with Clock, Has[SlideApp]] = {
     for {
-      slideVar     <- HubLikeSubscriptionRef.make(SlideState.empty)
-      questionsVar <- HubLikeSubscriptionRef.make(QuestionState.empty)
+      slideVar           <- HubLikeSubscriptionRef.make(SlideState.empty)
+      questionsVar       <- HubLikeSubscriptionRef.make(QuestionState.empty)
+      populationStatsVar <- HubLikeSubscriptionRef.make(PopulationStats.empty)
 
       voteQueue <- Queue.bounded[CastVoteId](256).toManaged_
       voteStream <- ZStream
@@ -91,7 +123,9 @@ object SlideAppLive {
       questionStateRef = questionsVar.ref,
       questionStateStream = questionsVar.changes,
       voteQueue = voteQueue,
-      voteStream = ZStream.unwrap(voteStream)
+      voteStream = ZStream.unwrap(voteStream),
+      populationStatsRef = populationStatsVar.ref,
+      populationStatsStream = populationStatsVar.changes
     )
   }.toLayer
 }

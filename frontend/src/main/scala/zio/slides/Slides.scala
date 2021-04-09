@@ -18,6 +18,7 @@ object Slides {
   val questionStateVar: Var[QuestionState]        = Var(QuestionState.empty)
   val isAskingVar                                 = Var(Option.empty[SlideIndex])
   val isAdminVar                                  = Var(false)
+  val populationStatsVar: Var[PopulationStats]    = Var(PopulationStats.empty)
 
   def BottomPanel: Div =
     div(
@@ -245,6 +246,8 @@ object Slides {
           voteStateVar.update(_.processUpdates(votes.filterNot(v => userIdVar.now().contains(v.id))))
         case ServerCommand.SendUserId(id) =>
           userIdVar.set(Some(id))
+        case ServerCommand.SendPopulationStats(populationStats) =>
+          populationStatsVar.set(populationStats)
       }
     },
     BottomPanel,
@@ -262,7 +265,8 @@ object Slides {
         .combineWithFn(questionStateVar.signal.map(_.activeQuestion.isDefined))(_ || _)
         .map { if (_) "slide-app-shrink" else "slide-app" },
       pre(
-        "Zymposium",
+        "Zymposium — ",
+        child.text <-- populationStatsVar.signal.map(_.connectedUsers.toString),
         onDblClick --> { _ =>
           val state = slideStateVar.now()
           isAskingVar.update {

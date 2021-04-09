@@ -2,6 +2,21 @@ package zio.slides
 
 import zio.json._
 
+case class PopulationStats(connectedUsers: Int) {
+  def addOne: PopulationStats =
+    copy(connectedUsers = connectedUsers + 1)
+
+  def removeOne: PopulationStats =
+    copy(connectedUsers = connectedUsers - 1)
+}
+
+object PopulationStats {
+  def empty: PopulationStats = PopulationStats(1)
+
+  implicit val codec: JsonCodec[PopulationStats] =
+    DeriveJsonCodec.gen[PopulationStats]
+}
+
 case class SlideState(slideIndex: Int, slideStepMap: Map[Int, Int]) {
   def stepIndex: Int = stepForSlide(slideIndex)
 

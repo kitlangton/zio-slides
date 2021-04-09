@@ -16,7 +16,7 @@ import zio.duration.durationInt
 import zio.interop.catz._
 import zio.json._
 import zio.magic.ZioProvideMagicOps
-import zio.slides.ServerCommand.{SendQuestionState, SendSlideState, SendUserId, SendVotes}
+import zio.slides.ServerCommand.{SendPopulationStats, SendQuestionState, SendSlideState, SendUserId, SendVotes}
 import zio.slides.VoteState.UserId
 import zio.stream.ZStream
 import zio.stream.interop.fs2z.zStreamSyntax
@@ -40,8 +40,9 @@ object Server extends App {
           .mergeAllUnbounded()(
             SlideApp.slideStateStream.map[ServerCommand](SendSlideState).map(s => Text(s.toJson)),
             SlideApp.questionStateStream.map[ServerCommand](SendQuestionState).map(s => Text(s.toJson)),
-            ZStream.succeed[ServerCommand](SendUserId(userId)).map(s => Text(s.toJson)),
             SlideApp.voteStream.map[ServerCommand](SendVotes).map(s => Text(s.toJson)),
+            SlideApp.populationStatsStream.map[ServerCommand](SendPopulationStats).map(s => Text(s.toJson)),
+            ZStream.succeed[ServerCommand](SendUserId(userId)).map(s => Text(s.toJson)),
             ZStream.fromSchedule(Schedule.spaced(20.seconds).as(WebSocketFrame.Ping()))
           )
           .toFs2Stream
@@ -58,12 +59,13 @@ object Server extends App {
           putStrLn(s"Unknown type: $f")
       }
 
-      WebSocketBuilder[AppTask]
-        .build(
-          send = toClient,
-          receive = fromClient,
-          onClose = putStrLn(s"GOODBYE $userId")
-        )
+      SlideApp.userJoined *>
+        WebSocketBuilder[AppTask]
+          .build(
+            send = toClient,
+            receive = fromClient,
+            onClose = SlideApp.userLeft *> putStrLn(s"GOODBYE $userId")
+          )
   }
 
   override def run(args: List[String]): ZIO[ZEnv, Nothing, ExitCode] =
