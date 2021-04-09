@@ -7,84 +7,49 @@ import zio.duration.durationInt
 import zio.slides.VoteState.{CastVoteId, UserId}
 import zio.stream.{SubscriptionRef, UStream, ZStream}
 
-import java.util.UUID
-
+/** Improvements:
+  *
+  * - Add a VoteStateRef. Send the current Vote State to a user
+  *   when they join.
+  *
+  * - When a user disconnects, remove their votes.
+  */
 trait SlideApp {
-  def slideState: UStream[SlideState]
-  def activeQuestion: UStream[Option[UUID]]
-  def allQuestions: UStream[Vector[Question]]
+  def slideStateStream: UStream[SlideState]
+  def questionStateStream: UStream[QuestionState]
+  def voteStream: UStream[Chunk[CastVoteId]]
 
-  def votes: UStream[Chunk[CastVoteId]]
-
-  def receive(id: UserId, appCommand: AppCommand): UIO[Unit]
+  def receive(id: UserId, appCommand: ClientCommand): UIO[Unit]
 }
 
 object SlideApp {
-  val live: URLayer[Console with Clock, Has[SlideApp]] = {
-    for {
-      _ <- putStrLn("STARTING UP SLIDE APP")
-        .toManaged(_ => putStrLn("SHUTTING DOWN SLIDE APP"))
-
-      // Slide State
-      // TODO: Use SubscriptionRef
-      slideQueue  <- Queue.bounded[SlideState](256).toManaged_
-      slideRef    <- RefM.make(SlideState.empty).map(_.tapInput(slideQueue.offer)).toManaged_
-      slideStream <- ZStream.fromQueue(slideQueue).broadcastDynamic(10)
-
-      // Questions
-      questionQueue <- Queue.bounded[QuestionState](256).toManaged_
-      questionRef   <- RefM.make(QuestionState.empty).map(_.tapInput(questionQueue.offer)).toManaged_
-      questionStream0 <- ZStream
-        .fromQueue(questionQueue)
-        .broadcastDynamic(10)
-      questionStream = ZStream.fromEffect(questionRef.get) ++ ZStream.fromEffect(questionStream0).flatten
-
-      // Votes
-      voteQueue <- Queue.bounded[CastVoteId](256).toManaged_
-//      voteRef    <- Ref.make(VoteState.empty).toManaged_
-      voteStream <- ZStream
-        .fromQueue(voteQueue)
-        .groupedWithin(100, 300.millis)
-        .broadcastDynamic(10)
-    } yield SlideAppLive(
-      slideStateRef = slideRef,
-      slideState = ZStream.fromEffect(slideRef.get) ++ ZStream.fromEffect(slideStream).flatten,
-      questionStateRef = questionRef,
-      activeQuestion = questionStream.map(_.activeQuestionId),
-      allQuestions = questionStream.map(_.questions),
-      voteQueue = voteQueue,
-      votes = ZStream.unwrap(voteStream)
-    )
-  }.toLayer
+  val live: URLayer[Console with Clock, Has[SlideApp]] = SlideAppLive.layer
 
   // Accessor Methods
 
   def slideStateStream: ZStream[Has[SlideApp], Nothing, SlideState] =
-    ZStream.accessStream[Has[SlideApp]](_.get.slideState)
+    ZStream.accessStream[Has[SlideApp]](_.get.slideStateStream)
 
-  def activeQuestionStream: ZStream[Has[SlideApp], Nothing, Option[UUID]] =
-    ZStream.accessStream[Has[SlideApp]](_.get.activeQuestion)
+  def questionStateStream: ZStream[Has[SlideApp], Nothing, QuestionState] =
+    ZStream.accessStream[Has[SlideApp]](_.get.questionStateStream)
 
-  def questionsStream: ZStream[Has[SlideApp], Nothing, Vector[Question]] =
-    ZStream.accessStream[Has[SlideApp]](_.get.allQuestions)
+  def voteStream: ZStream[Has[SlideApp], Nothing, Chunk[CastVoteId]] =
+    ZStream.accessStream[Has[SlideApp]](_.get.voteStream)
 
-  def votes: ZStream[Has[SlideApp], Nothing, Chunk[CastVoteId]] =
-    ZStream.accessStream[Has[SlideApp]](_.get.votes)
-
-  def receive(id: UserId, appCommand: AppCommand): ZIO[Has[SlideApp], Nothing, Unit] =
+  def receive(id: UserId, appCommand: ClientCommand): ZIO[Has[SlideApp], Nothing, Unit] =
     ZIO.accessM[Has[SlideApp]](_.get.receive(id, appCommand))
 }
 
 case class SlideAppLive(
     slideStateRef: RefM[SlideState],
-    slideState: UStream[SlideState],
+    slideStateStream: UStream[SlideState],
     questionStateRef: RefM[QuestionState],
-    activeQuestion: UStream[Option[UUID]],
-    allQuestions: UStream[Vector[Question]],
+    questionStateStream: UStream[QuestionState],
     voteQueue: Queue[CastVoteId],
-    votes: UStream[Chunk[CastVoteId]]
+    voteStream: UStream[Chunk[CastVoteId]]
 ) extends SlideApp {
-  override def receive(id: UserId, appCommand: AppCommand): UIO[Unit] = appCommand match {
+
+  override def receive(id: UserId, appCommand: ClientCommand): UIO[Unit] = appCommand match {
     case command: AdminCommand => receive(command)
     case command: UserCommand  => receive(id, command)
   }
@@ -106,4 +71,27 @@ case class SlideAppLive(
       case UserCommand.SendVote(topic, vote) =>
         voteQueue.offer(CastVoteId(id, topic, vote)).unit
     }
+}
+
+object SlideAppLive {
+  val layer: URLayer[Console with Clock, Has[SlideApp]] = {
+    for {
+      slideVar     <- SubscriptionRef.make(SlideState.empty).toManaged_
+      questionsVar <- SubscriptionRef.make(QuestionState.empty).toManaged_
+
+      voteQueue <- Queue.bounded[CastVoteId](256).toManaged_
+      voteStream <- ZStream
+        .fromQueue(voteQueue)
+        .groupedWithin(100, 300.millis)
+        .broadcastDynamic(10)
+
+    } yield SlideAppLive(
+      slideStateRef = slideVar.ref,
+      slideStateStream = slideVar.changes,
+      questionStateRef = questionsVar.ref,
+      questionStateStream = questionsVar.changes,
+      voteQueue = voteQueue,
+      voteStream = ZStream.unwrap(voteStream)
+    )
+  }.toLayer
 }

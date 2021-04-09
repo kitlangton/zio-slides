@@ -1,6 +1,6 @@
 package zio.slides
 
-import zio.json.{DeriveJsonCodec, JsonCodec, JsonDecoder, JsonEncoder}
+import zio.json.{DeriveJsonCodec, JsonCodec}
 
 import java.util.UUID
 
@@ -19,6 +19,5 @@ object Question {
   def apply(question: String, slideIndex: SlideIndex): Question =
     new Question(UUID.randomUUID(), question, slideIndex)
 
-  implicit val uuidCodec                  = JsonCodec(JsonEncoder.uuid, JsonDecoder.uuid)
   implicit val codec: JsonCodec[Question] = DeriveJsonCodec.gen[Question]
 }

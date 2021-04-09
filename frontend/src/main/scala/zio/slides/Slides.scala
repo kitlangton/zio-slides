@@ -7,10 +7,10 @@ import io.laminext.websocket.zio._
 import scala.util.Try
 
 object Slides {
-  val ws: WebSocket[ServerCommand, AppCommand] =
+  val ws: WebSocket[ServerCommand, ClientCommand] =
     WebSocket
       .url(Config.webSocketsUrl)
-      .json[ServerCommand, AppCommand]
+      .json[ServerCommand, ClientCommand]
       .build(reconnectRetries = Int.MaxValue)
 
   val slideIndexOverride: Var[Option[SlideIndex]] = Var(None)
@@ -18,21 +18,6 @@ object Slides {
   val questionStateVar: Var[QuestionState]        = Var(QuestionState.empty)
   val isAskingVar                                 = Var(Option.empty[SlideIndex])
   val isAdminVar                                  = Var(false)
-
-  def WebSocketStatus: Div = div(
-    border("1px solid #333"),
-    padding("12px"),
-    child.text <-- ws.isConnecting.map { if (_) "CONNECTING" else "" },
-    child.text <-- ws.isConnected.map { if (_) "CONNECTED" else "" },
-    div(
-      child.text <-- ws.events.map {
-        case WebSocketEvent.Connected(ws)             => "CONNECT"
-        case WebSocketEvent.Closed(ws, willReconnect) => "CLOSED"
-        case WebSocketEvent.Error(error)              => "ERROR"
-        case WebSocketEvent.Received(message)         => "RECEIVED"
-      }
-    )
-  )
 
   def BottomPanel: Div =
     div(
@@ -253,18 +238,14 @@ object Slides {
       command match {
         case ServerCommand.SendSlideState(slideState) =>
           slideStateVar.set(slideState)
-        case ServerCommand.SendAllQuestions(questions) =>
-          questionStateVar.update(_.copy(questions = questions))
-        case ServerCommand.SendActiveQuestion(activeQuestion) =>
-          questionStateVar.update(_.copy(activeQuestionId = activeQuestion))
+        case ServerCommand.SendQuestionState(questionState) =>
+          questionStateVar.set(questionState)
         case ServerCommand.SendVotes(votes) =>
-          println(s"RECEIVED VOTES ${votes}")
           voteStateVar.update(_.processUpdates(votes.filterNot(v => userIdVar.now().contains(v.id))))
         case ServerCommand.SendUserId(id) =>
           userIdVar.set(Some(id))
       }
     },
-    WebSocketStatus,
     BottomPanel,
     textAlign.center,
     div(
@@ -279,10 +260,12 @@ object Slides {
         .map(_.isDefined)
         .combineWithFn(questionStateVar.signal.map(_.activeQuestion.isDefined))(_ || _)
         .map { if (_) "slide-app-shrink" else "slide-app" },
-      pre("Scala Café"),
+      pre("Zymposium"),
       windowEvents.onKeyDown.map(_.key) --> {
-        case "‡" =>
-          isAdminVar.update(!_)
+        case Config.magicalRune => isAdminVar.update(!_)
+        case _                  => ()
+      },
+      windowEvents.onKeyDown.map(_.key) --> {
         case _ if !isAdminVar.now() =>
           ()
         case "ArrowRight" =>

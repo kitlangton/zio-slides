@@ -23,6 +23,5 @@ object QuestionState {
 
   def empty: QuestionState = QuestionState()
 
-  implicit val uuidCodec                       = JsonCodec(JsonEncoder.uuid, JsonDecoder.uuid)
   implicit val codec: JsonCodec[QuestionState] = DeriveJsonCodec.gen[QuestionState]
 }

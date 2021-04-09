@@ -4,6 +4,8 @@ import zio.Chunk
 import zio.json.{DeriveJsonCodec, JsonCodec}
 import zio.slides.VoteState.{CastVoteId, Topic, UserId, Vote, VoteMap}
 
+import java.util.UUID
+
 // user A
 // user B
 // user C
@@ -52,6 +54,8 @@ object VoteState {
 
   object UserId {
     implicit val codec: JsonCodec[UserId] = DeriveJsonCodec.gen[UserId]
+
+    def random: UserId = UserId(UUID.randomUUID().toString)
   }
 
   case class Vote(string: String) extends AnyVal

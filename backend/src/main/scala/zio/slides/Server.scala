@@ -16,16 +16,11 @@ import zio.duration.durationInt
 import zio.interop.catz._
 import zio.json._
 import zio.magic.ZioProvideMagicOps
+import zio.slides.ServerCommand.{SendQuestionState, SendSlideState, SendUserId, SendVotes}
 import zio.slides.VoteState.UserId
 import zio.stream.ZStream
 import zio.stream.interop.fs2z.zStreamSyntax
 
-import java.util.UUID
-
-/** TODO: Identity Management
-  *   - Authorization
-  *   - GitHub OAuth
-  */
 object Server extends App {
   type AppEnv     = ZEnv with Has[SlideApp]
   type AppTask[A] = RIO[AppEnv, A]
@@ -35,45 +30,40 @@ object Server extends App {
 
   private val routes = HttpRoutes.of[AppTask] {
     case GET -> Root =>
-      Ok("Hello")
+      Ok("Howdy!")
 
     case GET -> Root / "ws" =>
-      val id = UserId(UUID.randomUUID().toString)
-
-      //
+      val userId = UserId.random
 
       val toClient: fs2.Stream[AppTask, WebSocketFrame] =
         ZStream
           .mergeAllUnbounded()(
-            SlideApp.slideStateStream.map[ServerCommand](ServerCommand.SendSlideState).map(s => Text(s.toJson)),
-            SlideApp.questionsStream.map[ServerCommand](ServerCommand.SendAllQuestions).map(s => Text(s.toJson)),
-            SlideApp.activeQuestionStream.map[ServerCommand](ServerCommand.SendActiveQuestion).map(s => Text(s.toJson)),
-            ZStream.succeed[ServerCommand](ServerCommand.SendUserId(id)).map(s => Text(s.toJson)),
-            SlideApp.votes
-              .map[ServerCommand](ServerCommand.SendVotes)
-              .map(s => Text(s.toJson)),
+            SlideApp.slideStateStream.map[ServerCommand](SendSlideState).map(s => Text(s.toJson)),
+            SlideApp.questionStateStream.map[ServerCommand](SendQuestionState).map(s => Text(s.toJson)),
+            ZStream.succeed[ServerCommand](SendUserId(userId)).map(s => Text(s.toJson)),
+            SlideApp.voteStream.map[ServerCommand](SendVotes).map(s => Text(s.toJson)),
             ZStream.fromSchedule(Schedule.spaced(20.seconds).as(WebSocketFrame.Ping()))
           )
           .toFs2Stream
 
       val fromClient: Pipe[AppTask, WebSocketFrame, Unit] = _.evalMap {
         case Text(t, _) =>
-          putStrLn(s"RECEIVED: $t") *>
-            (t.fromJson[AppCommand] match {
-              case Left(error)    => putStrErr(s"DECODING ERROR $error")
-              case Right(command) => SlideApp.receive(id, command)
-            })
-        case f => putStrLn(s"Unknown type: $f")
+          t.fromJson[ClientCommand] match {
+            case Left(error) =>
+              putStrErr(s"DECODING ERROR $error")
+            case Right(command) =>
+              SlideApp.receive(userId, command)
+          }
+        case f =>
+          putStrLn(s"Unknown type: $f")
       }
 
-      putStrLn(s"CONNECTED $id") *>
-        WebSocketBuilder[AppTask]
-          .build(
-            send = toClient,
-            receive = fromClient,
-            onClose = putStrLn(s"GOODBYE $id")
-          )
-
+      WebSocketBuilder[AppTask]
+        .build(
+          send = toClient,
+          receive = fromClient,
+          onClose = putStrLn(s"GOODBYE $userId")
+        )
   }
 
   override def run(args: List[String]): ZIO[ZEnv, Nothing, ExitCode] =
@@ -82,7 +72,7 @@ object Server extends App {
       .flatMap(implicit runtime =>
         for {
           port <- system.envOrElse("PORT", "8088").map(_.toInt)
-          _    <- putStrLn("PORT: " + port.toString)
+          _    <- putStrLn(s"STARTING SERVER ON PORT $port")
           _ <- BlazeServerBuilder[AppTask](runtime.platform.executor.asEC)
             .bindHttp(port, "0.0.0.0")
             .withHttpApp(
