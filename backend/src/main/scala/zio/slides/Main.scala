@@ -38,7 +38,7 @@ object Main extends App {
     }
 
   override def run(args: List[String]): URIO[zio.ZEnv, ExitCode] = for {
-    port <- system.propertyOrElse("PORT", "8088").map(_.toInt).orElseSucceed(8088)
+    port <- system.envOrElse("PORT", "8088").map(_.toInt).orElseSucceed(8088)
     _    <- putStrLn(s"STARTING SERVER ON PORT $port")
     exitCode <- Server
       .start(port, app)
