@@ -2,7 +2,7 @@ name := "zio-slides"
 
 version := "0.1"
 
-val zioVersion    = "0.0.0+1-7f81902b-SNAPSHOT"
+val zioVersion    = "1.0.5+90-9b816198-SNAPSHOT"
 val http4sVersion = "0.21.21"
 
 val sharedSettings = Seq(
@@ -10,15 +10,10 @@ val sharedSettings = Seq(
   addCompilerPlugin("com.olegpy"    %% "better-monadic-for" % "0.3.1"),
   resolvers += "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots",
   libraryDependencies ++= Seq(
-    "dev.zio"      %%% "zio-json"          % "0.1.4",
-    "org.scala-lang" % "scala-reflect"     % scalaVersion.value % Provided,
-    "dev.zio"      %%% "zio"               % zioVersion,
-    "dev.zio"      %%% "zio-test"          % zioVersion         % Test,
-    "dev.zio"      %%% "zio-test-magnolia" % zioVersion         % Test,
-    "dev.zio"      %%% "zio-macros"        % zioVersion
+    "dev.zio"      %%% "zio-json"      % "0.1.4",
+    "org.scala-lang" % "scala-reflect" % scalaVersion.value % Provided
   ),
-  scalaVersion := "2.13.5",
-  testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework")
+  scalaVersion := "2.13.5"
 )
 
 scalacOptions ++= Seq("-Ymacro-annotations")
@@ -35,7 +30,8 @@ lazy val backend = project
       "dev.zio"              %% "zio-interop-cats"    % "2.4.0.0",
       "org.http4s"           %% "http4s-dsl"          % http4sVersion,
       "org.http4s"           %% "http4s-blaze-server" % http4sVersion,
-      "org.http4s"           %% "http4s-circe"        % http4sVersion
+      "org.http4s"           %% "http4s-circe"        % http4sVersion,
+      "dev.zio"              %% "zio"                 % zioVersion
     )
   )
   .dependsOn(shared)

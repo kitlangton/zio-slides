@@ -143,6 +143,7 @@ object Slides {
   private def AllQuestions: Div =
     div(
       panelStyles(isAdminVar.signal),
+      cls("all-questions"),
       children <-- questionStateVar.signal.map(_.questions).split(_.id) { (id, question, _) =>
         div(
           color <-- questionStateVar.signal.map(qs => if (qs.activeQuestionId.contains(id)) "green" else "white"),
@@ -161,10 +162,10 @@ object Slides {
   lazy val voteStateVar = Var(VoteState.empty)
 
   lazy val exampleOptions: List[String] = List(
-    "Variance (Pros and Contras)",
-    "Effect Systems from Scratch",
-    "Fancy IntelliJ Tips",
-    "Something Else..."
+    "Full Stack Architecture",
+    "Scala.js & Laminar",
+    "WebSocket Communication",
+    ""
   )
 
   lazy val exampleTopic: VoteState.Topic = VoteState.Topic("Scala-Topic")
@@ -260,7 +261,16 @@ object Slides {
         .map(_.isDefined)
         .combineWithFn(questionStateVar.signal.map(_.activeQuestion.isDefined))(_ || _)
         .map { if (_) "slide-app-shrink" else "slide-app" },
-      pre("Zymposium"),
+      pre(
+        "Zymposium",
+        onDblClick --> { _ =>
+          val state = slideStateVar.now()
+          isAskingVar.update {
+            case Some(_) => None
+            case None    => Some(SlideIndex(state.slideIndex, state.stepIndex))
+          }
+        }
+      ),
       windowEvents.onKeyDown.map(_.key) --> {
         case Config.magicalRune => isAdminVar.update(!_)
         case _                  => ()
