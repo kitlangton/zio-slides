@@ -94,16 +94,6 @@ case class SlideAppLive(
     populationStatsRef.update(stats => UIO(stats.addOne))
 }
 
-/** SubscriptionRef
-  * val ref = Ref[Int]
-  * ref.set(20)
-  * ref.set(10)
-  * ref.set(0)
-  * ref.get
-  *
-  * subscriptionRef.changes : UStream[Int]
-  */
-
 object SlideAppLive {
   val layer: URLayer[Console with Clock, Has[SlideApp]] = {
     for {
@@ -129,14 +119,3 @@ object SlideAppLive {
     )
   }.toLayer
 }
-
-//final class HubLikeSubscriptionRef[A] private (val ref: RefM[A], val changes: Stream[Nothing, A])
-//
-//object HubLikeSubscriptionRef {
-//  def make[A](a: A): ZManaged[Any, Nothing, HubLikeSubscriptionRef[A]] =
-//    for {
-//      (ref, queue) <- RefM.dequeueRef(a).toManaged_
-//      broadcast    <- ZStream.fromQueue(queue).broadcastDynamic(10)
-//      stream = ZStream.fromEffect(ref.get) ++ ZStream.unwrap(broadcast)
-//    } yield new HubLikeSubscriptionRef(ref, stream)
-//}

@@ -251,6 +251,9 @@ object Slides {
       println(s"SENDING VOTE $vote ")
       ws.sendOne(vote)
     },
+    onMountCallback { _ =>
+      ws.sendOne(UserCommand.ConnectionPlease())
+    },
     ws.received --> { command =>
       command match {
         case ServerCommand.SendSlideState(slideState) =>
@@ -280,7 +283,7 @@ object Slides {
         .combineWithFn(questionStateVar.signal.map(_.activeQuestion.isDefined))(_ || _)
         .map { if (_) "slide-app-shrink" else "slide-app" },
       pre(
-        "Zymposium — ",
+        "Symposium — ",
         child.text <-- populationStatsVar.signal.map(_.connectedUsers.toString),
         onDblClick --> { _ =>
           val state = slideStateVar.now()
