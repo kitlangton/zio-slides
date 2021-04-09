@@ -5,7 +5,7 @@ import zio.clock.Clock
 import zio.console.{Console, putStrLn}
 import zio.duration.durationInt
 import zio.slides.VoteState.{CastVoteId, UserId}
-import zio.stream.{SubscriptionRef, UStream, ZStream}
+import zio.stream._
 
 /** Improvements:
   *
@@ -76,8 +76,8 @@ case class SlideAppLive(
 object SlideAppLive {
   val layer: URLayer[Console with Clock, Has[SlideApp]] = {
     for {
-      slideVar     <- SubscriptionRef.make(SlideState.empty).toManaged_
-      questionsVar <- SubscriptionRef.make(QuestionState.empty).toManaged_
+      slideVar     <- HubLikeSubscriptionRef.make(SlideState.empty)
+      questionsVar <- HubLikeSubscriptionRef.make(QuestionState.empty)
 
       voteQueue <- Queue.bounded[CastVoteId](256).toManaged_
       voteStream <- ZStream
@@ -94,4 +94,15 @@ object SlideAppLive {
       voteStream = ZStream.unwrap(voteStream)
     )
   }.toLayer
+}
+
+final class HubLikeSubscriptionRef[A] private (val ref: RefM[A], val changes: Stream[Nothing, A])
+
+object HubLikeSubscriptionRef {
+  def make[A](a: A): ZManaged[Any, Nothing, HubLikeSubscriptionRef[A]] =
+    for {
+      (ref, queue) <- RefM.dequeueRef(a).toManaged_
+      broadcast    <- ZStream.fromQueue(queue).broadcastDynamic(10)
+      stream = ZStream.fromEffect(ref.get) ++ ZStream.unwrap(broadcast)
+    } yield new HubLikeSubscriptionRef(ref, stream)
 }
