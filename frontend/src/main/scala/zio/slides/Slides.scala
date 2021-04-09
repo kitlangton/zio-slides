@@ -11,7 +11,7 @@ object Slides {
     WebSocket
       .url(Config.webSocketsUrl)
       .json[ServerCommand, ClientCommand]
-      .build(reconnectRetries = Int.MaxValue)
+      .build(reconnectRetries = Int.MaxValue, bufferWhenDisconnected = false)
 
   val slideIndexOverride: Var[Option[SlideIndex]] = Var(None)
   val slideStateVar: Var[SlideState]              = Var(SlideState.empty)
@@ -19,6 +19,14 @@ object Slides {
   val isAskingVar                                 = Var(Option.empty[SlideIndex])
   val isAdminVar                                  = Var(false)
   val populationStatsVar: Var[PopulationStats]    = Var(PopulationStats.empty)
+
+  def WebSocketInfo: Div = div(
+    child.text <-- ws.isConnecting.combineWithFn(ws.isConnected) {
+      case (_, true) => "Connected"
+      case (true, _) => "Connecting"
+      case (_, _)    => "Disconnected"
+    }
+  )
 
   def BottomPanel: Div =
     div(
@@ -41,6 +49,7 @@ object Slides {
           case None           => slideIndexOverride.set(None)
         }
       },
+      WebSocketInfo,
       ActiveQuestion,
       AskQuestion,
       AdminPanel
@@ -232,6 +241,12 @@ object Slides {
 
   def view: Div = div(
     ws.connect,
+    child.maybe <-- ws.isConnected.map {
+      Option.when(_)(view2)
+    }
+  )
+
+  def view2: Div = div(
     voteBus.events.debounce(500) --> { vote =>
       println(s"SENDING VOTE $vote ")
       ws.sendOne(vote)

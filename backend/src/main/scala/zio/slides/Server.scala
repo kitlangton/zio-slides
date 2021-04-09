@@ -11,7 +11,7 @@ import org.http4s.server.websocket.WebSocketBuilder
 import org.http4s.websocket.WebSocketFrame.Text
 import org.http4s.websocket._
 import zio._
-import zio.console.{putStrErr, putStrLn}
+import zio.console.{putStr, putStrErr, putStrLn}
 import zio.duration.durationInt
 import zio.interop.catz._
 import zio.json._
@@ -53,18 +53,23 @@ object Server extends App {
             case Left(error) =>
               putStrErr(s"DECODING ERROR $error")
             case Right(command) =>
+              println(s"RECEIVED COMMAND $command")
               SlideApp.receive(userId, command)
           }
         case f =>
           putStrLn(s"Unknown type: $f")
       }
+        .handleErrorWith { throwable =>
+          ZStream.fromEffect(putStrLn(s"OH NO: $throwable")).toFs2Stream
+        }
 
-      SlideApp.userJoined *>
+      putStrLn(s"USER JOINED: $userId") *>
+        SlideApp.userJoined *>
         WebSocketBuilder[AppTask]
           .build(
             send = toClient,
             receive = fromClient,
-            onClose = SlideApp.userLeft *> putStrLn(s"GOODBYE $userId")
+            onClose = SlideApp.userLeft *> putStrLn(s"USER LEFT: $userId")
           )
   }
 

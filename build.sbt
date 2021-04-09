@@ -11,6 +11,7 @@ val sharedSettings = Seq(
   resolvers += "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots",
   libraryDependencies ++= Seq(
     "dev.zio"      %%% "zio"           % zioVersion,
+    "dev.zio"      %%% "zio-streams"   % zioVersion,
     "dev.zio"      %%% "zio-json"      % "0.1.4",
     "org.scala-lang" % "scala-reflect" % scalaVersion.value % Provided
   ),
@@ -26,9 +27,11 @@ lazy val backend = project
   .enablePlugins(JavaAppPackaging)
   .settings(
     sharedSettings,
+    testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
     libraryDependencies ++= Seq(
       "io.github.kitlangton" %% "zio-magic"           % "0.2.3",
       "dev.zio"              %% "zio-interop-cats"    % "2.4.0.0",
+      "dev.zio"              %% "zio-test"            % zioVersion % Test,
       "org.http4s"           %% "http4s-dsl"          % http4sVersion,
       "org.http4s"           %% "http4s-blaze-server" % http4sVersion,
       "org.http4s"           %% "http4s-circe"        % http4sVersion
@@ -41,7 +44,7 @@ lazy val frontend = project
   .enablePlugins(ScalaJSPlugin)
   .settings(
     scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.ESModule) },
-    scalaJSLinkerConfig ~= { _.withSourceMap(false) },
+//    scalaJSLinkerConfig ~= { _.withSourceMap(false) },
     scalaJSUseMainModuleInitializer := true,
     libraryDependencies ++= Seq(
       "com.raquo"         %%% "laminar"         % "0.12.1",
