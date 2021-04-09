@@ -4,7 +4,7 @@ import zhttp.http._
 import zhttp.service._
 import zhttp.socket._
 import zio._
-import zio.console.{Console, putStrErr}
+import zio.console.{Console, putStrErr, putStrLn}
 import zio.json.{DecoderOps, EncoderOps}
 import zio.slides.ServerCommand.{SendPopulationStats, SendQuestionState, SendSlideState, SendUserId, SendVotes}
 import zio.slides.VoteState.UserId
@@ -37,10 +37,12 @@ object Main extends App {
       Response.socket(socket(userId))
     }
 
-  override def run(args: List[String]): URIO[zio.ZEnv, ExitCode] = {
-    Server
-      .start(8088, app)
+  override def run(args: List[String]): URIO[zio.ZEnv, ExitCode] = for {
+    port <- system.propertyOrElse("PORT", "8088").map(_.toInt).orElseSucceed(8088)
+    _    <- putStrLn(s"STARTING SERVER ON PORT $port")
+    exitCode <- Server
+      .start(port, app)
       .provideCustomLayer(SlideApp.live)
       .exitCode
-  }
+  } yield exitCode
 }
