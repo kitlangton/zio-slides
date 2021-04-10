@@ -36,13 +36,16 @@ object Main extends App {
                 ZStream.succeed[ServerCommand](SendUserId(userId)).map(s => WebSocketFrame.text(s.toJson)),
                 ZStream.fromSchedule(Schedule.spaced(20.seconds)).as(WebSocketFrame.ping)
               )
+              .tap { message =>
+                putStrLn(message.toString)
+              }
               .mapErrorCause[Nothing] { cause =>
                 println(s"CAUSE! $cause")
                 cause
               }
           case Right(command) =>
             println(s"RECEIVED COMMEND: \n\t$userId \n\t$command")
-            ZStream.fromEffect(SlideApp.receive(userId, command)).as(WebSocketFrame.ping)
+            ZStream.fromEffect(SlideApp.receive(userId, command)).as(WebSocketFrame.pong)
         }
       case WebSocketFrame.Close(status, reason) =>
         println(s"RECEIVED CLOSE: \n\t$userId\n\t$status\n\t$reason")
@@ -65,6 +68,9 @@ object Main extends App {
   override def run(args: List[String]): URIO[zio.ZEnv, ExitCode] = (for {
     port <- system.envOrElse("PORT", "8088").map(_.toInt).orElseSucceed(8088)
     _    <- putStrLn(s"STARTING SERVER ON PORT $port")
-    _    <- Server.start(port, app).provideCustomLayer(SlideApp.live)
-  } yield ()).exitCode
+    _    <- SlideApp.slideStateStream.foreach { slideState => putStrLn(s"SLIDE STATE: $slideState") }.fork
+    _    <- Server.start(port, app)
+  } yield ())
+    .provideCustomLayer(SlideApp.live)
+    .exitCode
 }
