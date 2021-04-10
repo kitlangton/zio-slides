@@ -24,7 +24,7 @@ object Main extends App {
           case Right(UserCommand.ConnectionPlease()) =>
             println(s"RECEIVED CONNECTION PLEASE: $userId")
             ZStream
-              .mergeAll(7)(
+              .mergeAllUnbounded()(
                 SlideApp.slideStateStream.map[ServerCommand](SendSlideState).map(s => WebSocketFrame.text(s.toJson)),
                 SlideApp.questionStateStream
                   .map[ServerCommand](SendQuestionState)
@@ -56,14 +56,15 @@ object Main extends App {
     }
 
   private val app =
-    Http.collect { case Method.GET -> Root / "ws" =>
-      val userId = UserId.random
-      Response.socket(socket(userId))
+    Http.collectM { case Method.GET -> Root / "ws" =>
+      for {
+        userId <- UIO(UserId.random)
+      } yield Response.socket(socket(userId))
     }
 
-  override def run(args: List[String]): URIO[zio.ZEnv, ExitCode] = for {
-    port     <- system.envOrElse("PORT", "8088").map(_.toInt).orElseSucceed(8088)
-    _        <- putStrLn(s"STARTING SERVER ON PORT $port")
-    exitCode <- Server.start(port, app).provideCustomLayer(SlideApp.live).exitCode
-  } yield exitCode
+  override def run(args: List[String]): URIO[zio.ZEnv, ExitCode] = (for {
+    port <- system.envOrElse("PORT", "8088").map(_.toInt).orElseSucceed(8088)
+    _    <- putStrLn(s"STARTING SERVER ON PORT $port")
+    _    <- Server.start(port, app).provideCustomLayer(SlideApp.live)
+  } yield ()).exitCode
 }
