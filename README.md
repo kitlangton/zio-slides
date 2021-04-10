@@ -1,5 +1,7 @@
 # zio-slides
 
+An interactive, websocket-backed slide presentation app running on `ZIO`, `zio-http`, and `Laminar`.
+
 ## Running Locally
 
 1. `sbt ~frontend/fastLinkJS` in another tab.
