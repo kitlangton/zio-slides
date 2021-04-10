@@ -99,9 +99,9 @@ case class SlideAppLive(
 object SlideAppLive {
   val layer: URLayer[Console with Clock, Has[SlideApp]] = {
     for {
-      slideVar           <- SubscriptionRef.make(SlideState.empty).toManaged_
-      questionsVar       <- SubscriptionRef.make(QuestionState.empty).toManaged_
-      populationStatsVar <- SubscriptionRef.make(PopulationStats.empty).toManaged_
+      slideVar           <- Var.make(SlideState.empty).toManaged_
+      questionsVar       <- Var.make(QuestionState.empty).toManaged_
+      populationStatsVar <- Var.make(PopulationStats.empty).toManaged_
 
       voteQueue <- Queue.bounded[CastVoteId](256).toManaged_
       voteStream <- ZStream
@@ -120,4 +120,23 @@ object SlideAppLive {
       populationStatsStream = populationStatsVar.changes
     )
   }.toLayer
+}
+
+final class Var[A] private (val ref: RefM[A], val changes: Stream[Nothing, A])
+
+object Var {
+
+  /** Creates a new `Var` with the specified value.
+    */
+  def make[A](a: A): UIO[Var[A]] =
+    for {
+      ref <- RefM.make(a)
+      hub <- Hub.sliding[A](512)
+      changes = ZStream.unwrapManaged {
+        for {
+          a     <- ref.get.toManaged_
+          queue <- hub.subscribe
+        } yield ZStream(a) ++ ZStream.fromQueue(queue)
+      }
+    } yield new Var(ref.tapInput(hub.publish), changes)
 }
