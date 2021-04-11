@@ -103,11 +103,8 @@ object SlideAppLive {
       questionsVar       <- SubscriptionRef.make(QuestionState.empty).toManaged_
       populationStatsVar <- SubscriptionRef.make(PopulationStats.empty).toManaged_
 
-      voteQueue <- Queue.bounded[CastVoteId](256).toManaged_
-      voteStream <- ZStream
-        .fromQueue(voteQueue)
-        .groupedWithin(100, 300.millis)
-        .broadcastDynamic(10)
+      voteQueue  <- Queue.bounded[CastVoteId](256).toManaged_
+      voteStream <- ZStream.fromQueue(voteQueue).groupedWithin(100, 300.millis).broadcastDynamic(32)
 
     } yield SlideAppLive(
       slideStateRef = slideVar.ref,

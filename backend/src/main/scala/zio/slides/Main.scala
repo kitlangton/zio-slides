@@ -4,7 +4,6 @@ import zhttp.http._
 import zhttp.service._
 import zhttp.socket._
 import zio._
-import zio.clock.Clock
 import zio.console.{Console, putStrErr, putStrLn}
 import zio.json.{DecoderOps, EncoderOps}
 import zio.slides.ServerCommand.{SendPopulationStats, SendQuestionState, SendSlideState, SendUserId, SendVotes}
@@ -52,6 +51,7 @@ object Main extends App {
   override def run(args: List[String]): URIO[zio.ZEnv, ExitCode] = (for {
     port <- system.envOrElse("PORT", "8088").map(_.toInt).orElseSucceed(8088)
     _    <- putStrLn(s"STARTING SERVER ON PORT $port")
+    _    <- SlideApp.populationStatsStream.foreach(stats => putStrLn(s"CONNECTED USERS ${stats.connectedUsers}")).fork
     _    <- Server.start(port, app)
   } yield ())
     .provideCustomLayer(SlideApp.live)
