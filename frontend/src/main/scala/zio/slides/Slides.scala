@@ -252,7 +252,7 @@ object Slides {
       println(s"SENDING VOTE $vote ")
       ws.sendOne(vote)
     },
-    onMountCallback { _ =>
+    ws.connected --> { _ =>
       ws.sendOne(UserCommand.ConnectionPlease())
     },
     ws.received --> { command =>

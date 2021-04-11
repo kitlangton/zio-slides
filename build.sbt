@@ -2,12 +2,17 @@ name := "zio-slides"
 
 version := "0.1"
 
-val zioVersion = "1.0.5+98-e0a2da7b-SNAPSHOT"
+val zioVersion     = "1.0.5+98-e0a2da7b-SNAPSHOT"
+val zioHttpVersion = "1.0.0.0-RC15+7-54a6202a-SNAPSHOT"
 
 val sharedSettings = Seq(
   addCompilerPlugin("org.typelevel" %% "kind-projector"     % "0.11.3" cross CrossVersion.full),
   addCompilerPlugin("com.olegpy"    %% "better-monadic-for" % "0.3.1"),
-  resolvers += "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots",
+  scalacOptions ++= Seq("-Ymacro-annotations", "-Xfatal-warnings"),
+  resolvers ++= Seq(
+    "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots",
+    "Sonatype OSS Snapshots s01" at "https://s01.oss.sonatype.org/content/repositories/snapshots"
+  ),
   libraryDependencies ++= Seq(
     "dev.zio"      %%% "zio"           % zioVersion,
     "dev.zio"      %%% "zio-streams"   % zioVersion,
@@ -19,7 +24,10 @@ val sharedSettings = Seq(
 
 scalacOptions ++= Seq("-Ymacro-annotations", "-Xfatal-warnings")
 
-resolvers += "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots"
+//resolvers ++= Seq(
+//  "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots",
+//  "Sonatype OSS Snapshots s01" at "https://s01.oss.sonatype.org/content/repositories/snapshots"
+//)
 
 lazy val backend = project
   .in(file("backend"))
@@ -30,7 +38,7 @@ lazy val backend = project
     libraryDependencies ++= Seq(
       "io.github.kitlangton" %% "zio-magic" % "0.2.3",
       "dev.zio"              %% "zio-test"  % zioVersion % Test,
-      "io.d11"               %% "zhttp"     % "1.0.0.0-RC15"
+      "io.d11"               %% "zhttp"     % zioHttpVersion
     )
   )
   .dependsOn(shared)

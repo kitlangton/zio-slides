@@ -12,43 +12,41 @@ import zio.slides.VoteState.UserId
 import zio.stream.ZStream
 
 object Main extends App {
-  def socket(
-      userId: UserId
-  ): Socket[Console with Clock with Has[SlideApp], SocketError, WebSocketFrame, WebSocketFrame] =
-    Socket.collect[WebSocketFrame] {
-      case WebSocketFrame.Close(status, reason) =>
-        println(s"CLOSING!!! $status $reason")
-        ZStream.fromEffect(SlideApp.userLeft).drain
-      case WebSocketFrame.Text(text) =>
-        text.fromJson[ClientCommand] match {
-          case Left(error) =>
-            ZStream.fromEffect(putStrErr(s"DECODING ERROR $error")).drain
-          case Right(UserCommand.ConnectionPlease()) =>
-            println(s"RECEIVED NEW CONNECTION: \n\t$userId")
-            ZStream
-              .mergeAllUnbounded()(
-                SlideApp.slideStateStream.map[ServerCommand](SendSlideState).map(s => WebSocketFrame.text(s.toJson)),
-                SlideApp.questionStateStream
-                  .map[ServerCommand](SendQuestionState)
-                  .map(s => WebSocketFrame.text(s.toJson)),
-                SlideApp.voteStream.map[ServerCommand](SendVotes).map(s => WebSocketFrame.text(s.toJson)),
-                SlideApp.populationStatsStream
-                  .map[ServerCommand](SendPopulationStats)
-                  .map(s => WebSocketFrame.text(s.toJson)),
-                ZStream.succeed[ServerCommand](SendUserId(userId)).map(s => WebSocketFrame.text(s.toJson))
-              )
-          case Right(command) =>
-            println(s"RECEIVED COMMAND: \n\t$userId \n\t$command")
-            ZStream.fromEffect(SlideApp.receive(userId, command)).drain
-        }
+  def userSocket: Socket[Has[SlideApp] with Console, Nothing] = {
+    val userId = UserId.random
+
+    val handleOpen = Socket.open { _ =>
+      ZStream.fromEffect(putStrLn(s"RECEIVED NEW CONNECTION: \n\t$userId")) *>
+        ZStream
+          .mergeAllUnbounded()(
+            ZStream.fromEffect(SlideApp.userJoined).drain,
+            SlideApp.slideStateStream.map(SendSlideState),
+            SlideApp.questionStateStream.map(SendQuestionState),
+            SlideApp.voteStream.map(SendVotes),
+            SlideApp.populationStatsStream.map(SendPopulationStats),
+            ZStream.succeed[ServerCommand](SendUserId(userId))
+          )
+          .map(s => WebSocketFrame.text(s.toJson))
     }
 
-  private val app =
-    Http.collectM { case Method.GET -> Root / "ws" =>
-      for {
-        userId <- UIO(UserId.random)
-        _      <- SlideApp.userJoined
-      } yield Response.socket(socket(userId))
+    val handleClose = Socket.close { _ => SlideApp.userLeft }
+
+    val handleCommand = Socket.collect { case WebSocketFrame.Text(text) =>
+      text.fromJson[ClientCommand] match {
+        case Left(error) =>
+          ZStream.fromEffect(putStrErr(s"DECODING ERROR $error")).drain
+        case Right(command) =>
+          println(s"RECEIVED COMMAND: \n\t$userId \n\t$command")
+          ZStream.fromEffect(SlideApp.receive(userId, command)).drain
+      }
+    }
+
+    handleCommand <+> handleOpen <+> handleClose
+  }
+
+  private val app: Http[Console with Has[SlideApp], Throwable] =
+    Http.collect { case Method.GET -> Root / "ws" =>
+      Response.socket(userSocket)
     }
 
   override def run(args: List[String]): URIO[zio.ZEnv, ExitCode] = (for {
