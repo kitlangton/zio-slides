@@ -241,9 +241,10 @@ object Slides {
 
   def view: Div = div(
     ws.connect,
-    child.maybe <-- ws.isConnected.map {
-      Option.when(_)(view2)
-    }
+    view2
+//    child.maybe <-- ws.isConnected.map {
+//      Option.when(_)(view2)
+//    }
   )
 
   def view2: Div = div(

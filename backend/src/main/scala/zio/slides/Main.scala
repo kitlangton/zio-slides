@@ -18,11 +18,11 @@ object Main extends App {
     Socket.collect[WebSocketFrame] {
       case WebSocketFrame.Close(status, reason) =>
         println(s"CLOSING!!! $status $reason")
-        ZStream.empty
+        ZStream.fromEffect(SlideApp.userLeft).drain
       case WebSocketFrame.Text(text) =>
         text.fromJson[ClientCommand] match {
           case Left(error) =>
-            ZStream.fromEffect(putStrErr(s"DECODING ERROR $error")) *> ZStream.empty
+            ZStream.fromEffect(putStrErr(s"DECODING ERROR $error")).drain
           case Right(UserCommand.ConnectionPlease()) =>
             println(s"RECEIVED NEW CONNECTION: \n\t$userId")
             ZStream
@@ -39,7 +39,7 @@ object Main extends App {
               )
           case Right(command) =>
             println(s"RECEIVED COMMAND: \n\t$userId \n\t$command")
-            ZStream.fromEffect(SlideApp.receive(userId, command)) *> ZStream.empty
+            ZStream.fromEffect(SlideApp.receive(userId, command)).drain
         }
     }
 
