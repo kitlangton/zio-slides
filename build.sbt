@@ -2,7 +2,7 @@ name := "zio-slides"
 
 version := "0.1"
 
-val zioVersion = "1.0.5+90-9b816198-SNAPSHOT"
+val zioVersion = "1.0.5+98-e0a2da7b-SNAPSHOT"
 
 val sharedSettings = Seq(
   addCompilerPlugin("org.typelevel" %% "kind-projector"     % "0.11.3" cross CrossVersion.full),
@@ -43,7 +43,7 @@ lazy val frontend = project
     scalaJSLinkerConfig ~= { _.withSourceMap(false) },
     scalaJSUseMainModuleInitializer := true,
     libraryDependencies ++= Seq(
-      "com.raquo"         %%% "laminar"         % "0.12.1",
+      "com.raquo"         %%% "laminar"         % "0.12.2",
       "io.github.cquiroz" %%% "scala-java-time" % "2.2.1",
       "io.laminext"       %%% "websocket"       % "0.12.2"
     )

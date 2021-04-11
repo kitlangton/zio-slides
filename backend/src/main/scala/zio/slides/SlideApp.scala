@@ -2,7 +2,6 @@ package zio.slides
 
 import zio._
 import zio.clock.Clock
-import zio.console.Console
 import zio.duration.durationInt
 import zio.slides.VoteState.{CastVoteId, UserId}
 import zio.stream._
@@ -100,9 +99,9 @@ case class SlideAppLive(
 object SlideAppLive {
   val layer: ZLayer[Clock, Nothing, Has[SlideApp]] = {
     for {
-      slideVar           <- Var.make(SlideState.empty).toManaged_
-      questionsVar       <- Var.make(QuestionState.empty).toManaged_
-      populationStatsVar <- Var.make(PopulationStats.empty).toManaged_
+      slideVar           <- SubscriptionRef.make(SlideState.empty).toManaged_
+      questionsVar       <- SubscriptionRef.make(QuestionState.empty).toManaged_
+      populationStatsVar <- SubscriptionRef.make(PopulationStats.empty).toManaged_
 
       voteQueue <- Queue.bounded[CastVoteId](256).toManaged_
       voteStream <- ZStream
@@ -121,27 +120,4 @@ object SlideAppLive {
       populationStatsStream = populationStatsVar.changes
     )
   }.toLayer
-}
-
-final class Var[A] private (val ref: RefM[A], val changes: Stream[Nothing, A])
-
-object Var {
-
-  /** Creates a new `Var` with the specified value.
-    */
-  def make[A](a: A): UIO[Var[A]] =
-    for {
-      ref <- RefM.make(a)
-//      hub <- Hub.unbounded[A]
-      hub <- Hub.sliding[A](128)
-      changes = ZStream.unwrapManaged {
-        ZManaged {
-          ref.modify { a =>
-            ZIO.succeedNow(a).zipWith(hub.subscribe.zio) { case (a, (finalizer, queue)) =>
-              (finalizer, ZStream(a) ++ ZStream.fromQueue(queue))
-            } <*> ZIO.succeedNow(a)
-          }.uninterruptible
-        }
-      }
-    } yield new Var(ref.tapInput(hub.publish), changes)
 }
