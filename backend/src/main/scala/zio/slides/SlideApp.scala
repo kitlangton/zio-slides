@@ -27,7 +27,7 @@ trait SlideApp {
 }
 
 object SlideApp {
-  val live: URLayer[Console with Clock, Has[SlideApp]] = SlideAppLive.layer
+  val live: URLayer[Clock, Has[SlideApp]] = SlideAppLive.layer
 
   // Accessor Methods
 
@@ -64,10 +64,11 @@ case class SlideAppLive(
     populationStatsStream: UStream[PopulationStats]
 ) extends SlideApp {
 
-  override def receive(id: UserId, appCommand: ClientCommand): UIO[Unit] = appCommand match {
-    case command: AdminCommand => receive(command)
-    case command: UserCommand  => receive(id, command)
-  }
+  override def receive(id: UserId, appCommand: ClientCommand): UIO[Unit] =
+    (appCommand match {
+      case command: AdminCommand => receive(command)
+      case command: UserCommand  => receive(id, command)
+    })
 
   private def receive(adminCommand: AdminCommand): UIO[Unit] =
     adminCommand match {
@@ -97,7 +98,7 @@ case class SlideAppLive(
 }
 
 object SlideAppLive {
-  val layer: URLayer[Console with Clock, Has[SlideApp]] = {
+  val layer: ZLayer[Clock, Nothing, Has[SlideApp]] = {
     for {
       slideVar           <- Var.make(SlideState.empty).toManaged_
       questionsVar       <- Var.make(QuestionState.empty).toManaged_
@@ -131,12 +132,16 @@ object Var {
   def make[A](a: A): UIO[Var[A]] =
     for {
       ref <- RefM.make(a)
-      hub <- Hub.sliding[A](512)
+//      hub <- Hub.unbounded[A]
+      hub <- Hub.sliding[A](128)
       changes = ZStream.unwrapManaged {
-        for {
-          a     <- ref.get.toManaged_
-          queue <- hub.subscribe
-        } yield ZStream(a) ++ ZStream.fromQueue(queue)
+        ZManaged {
+          ref.modify { a =>
+            ZIO.succeedNow(a).zipWith(hub.subscribe.zio) { case (a, (finalizer, queue)) =>
+              (finalizer, ZStream(a) ++ ZStream.fromQueue(queue))
+            } <*> ZIO.succeedNow(a)
+          }.uninterruptible
+        }
       }
     } yield new Var(ref.tapInput(hub.publish), changes)
 }

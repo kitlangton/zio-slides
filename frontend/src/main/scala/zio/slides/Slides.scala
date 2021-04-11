@@ -12,7 +12,7 @@ object Slides {
     WebSocket
       .url(Config.webSocketsUrl)
       .json[ServerCommand, ClientCommand]
-      .build(reconnectRetries = Int.MaxValue, reconnectDelay = 20.seconds)
+      .build(reconnectRetries = Int.MaxValue, reconnectDelay = 3.seconds)
 
   val slideIndexOverride: Var[Option[SlideIndex]] = Var(None)
   val slideStateVar: Var[SlideState]              = Var(SlideState.empty)

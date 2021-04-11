@@ -15,28 +15,32 @@ object Main extends App {
   def socket(
       userId: UserId
   ): Socket[Console with Clock with Has[SlideApp], SocketError, WebSocketFrame, WebSocketFrame] =
-    Socket.collect[WebSocketFrame] { case WebSocketFrame.Text(text) =>
-      text.fromJson[ClientCommand] match {
-        case Left(error) =>
-          ZStream.fromEffect(putStrErr(s"DECODING ERROR $error")).as(WebSocketFrame.pong)
-        case Right(UserCommand.ConnectionPlease()) =>
-          println(s"RECEIVED NEW CONNECTION: \n\t$userId")
-          ZStream
-            .mergeAllUnbounded()(
-              SlideApp.slideStateStream.map[ServerCommand](SendSlideState).map(s => WebSocketFrame.text(s.toJson)),
-              SlideApp.questionStateStream
-                .map[ServerCommand](SendQuestionState)
-                .map(s => WebSocketFrame.text(s.toJson)),
-              SlideApp.voteStream.map[ServerCommand](SendVotes).map(s => WebSocketFrame.text(s.toJson)),
-              SlideApp.populationStatsStream
-                .map[ServerCommand](SendPopulationStats)
-                .map(s => WebSocketFrame.text(s.toJson)),
-              ZStream.succeed[ServerCommand](SendUserId(userId)).map(s => WebSocketFrame.text(s.toJson))
-            )
-        case Right(command) =>
-          println(s"RECEIVED COMMAND: \n\t$userId \n\t$command")
-          ZStream.fromEffect(SlideApp.receive(userId, command)).as(WebSocketFrame.pong)
-      }
+    Socket.collect[WebSocketFrame] {
+      case WebSocketFrame.Close(status, reason) =>
+        println(s"CLOSING!!! $status $reason")
+        ZStream.empty
+      case WebSocketFrame.Text(text) =>
+        text.fromJson[ClientCommand] match {
+          case Left(error) =>
+            ZStream.fromEffect(putStrErr(s"DECODING ERROR $error")) *> ZStream.empty
+          case Right(UserCommand.ConnectionPlease()) =>
+            println(s"RECEIVED NEW CONNECTION: \n\t$userId")
+            ZStream
+              .mergeAllUnbounded()(
+                SlideApp.slideStateStream.map[ServerCommand](SendSlideState).map(s => WebSocketFrame.text(s.toJson)),
+                SlideApp.questionStateStream
+                  .map[ServerCommand](SendQuestionState)
+                  .map(s => WebSocketFrame.text(s.toJson)),
+                SlideApp.voteStream.map[ServerCommand](SendVotes).map(s => WebSocketFrame.text(s.toJson)),
+                SlideApp.populationStatsStream
+                  .map[ServerCommand](SendPopulationStats)
+                  .map(s => WebSocketFrame.text(s.toJson)),
+                ZStream.succeed[ServerCommand](SendUserId(userId)).map(s => WebSocketFrame.text(s.toJson))
+              )
+          case Right(command) =>
+            println(s"RECEIVED COMMAND: \n\t$userId \n\t$command")
+            ZStream.fromEffect(SlideApp.receive(userId, command)) *> ZStream.empty
+        }
     }
 
   private val app =
