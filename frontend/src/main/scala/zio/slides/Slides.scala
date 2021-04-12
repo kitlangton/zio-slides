@@ -3,11 +3,10 @@ package zio.slides
 import com.raquo.laminar.api.L._
 import io.laminext.websocket._
 import io.laminext.websocket.zio._
+import _root_.zio.slides.State._
+import _root_.zio.slides.Styles._
 
 import scala.concurrent.duration.DurationInt
-import scala.util.Try
-import State._
-import Styles._
 
 object State {
   val slideStateVar: Var[SlideState]           = Var(SlideState.empty)

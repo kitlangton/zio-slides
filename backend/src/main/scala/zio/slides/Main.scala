@@ -9,6 +9,18 @@ import zio.json.{DecoderOps, EncoderOps}
 import zio.slides.ServerCommand.{SendPopulationStats, SendQuestionState, SendSlideState, SendUserId, SendVotes}
 import zio.slides.VoteState.UserId
 import zio.stream.ZStream
+import zio.config._
+import zio.config.magnolia._
+
+case class Config(adminPassword: String)
+
+object Config {
+  val descriptor: ConfigDescriptor[Config] =
+    DeriveConfigDescriptor.descriptor[Config]
+
+  val live: ZLayer[system.System, Nothing, Has[Config]] =
+    (ZConfig.fromPropertiesFile("../application.conf", descriptor) orElse ZConfig.fromSystemEnv(descriptor)).orDie
+}
 
 object Main extends App {
   def adminSocket: Socket[Has[SlideApp] with Console, Nothing] = {
@@ -57,14 +69,14 @@ object Main extends App {
     handleCommand <+> handleOpen <+> handleClose
   }
 
-  private val app: Http[Console with Has[SlideApp], Throwable] =
+  private def app(adminPassword: String): Http[Console with Has[SlideApp], Throwable] =
     Http.collect {
       case Method.GET -> Root / "ws" =>
         Response.socket(userSocket)
 
       case req @ Method.GET -> Root / "ws" / "admin" =>
         req.url.query match {
-          case s"password=$password" if password == "hunter2" =>
+          case s"password=$password" if password == adminPassword =>
             Response.socket(adminSocket)
           case _ =>
             Response.fromHttpError(HttpError.Unauthorized("INVALID PASSWORD"))
@@ -72,11 +84,12 @@ object Main extends App {
     }
 
   override def run(args: List[String]): URIO[zio.ZEnv, ExitCode] = (for {
-    port <- system.envOrElse("PORT", "8088").map(_.toInt).orElseSucceed(8088)
-    _    <- SlideApp.populationStatsStream.foreach(stats => putStrLn(s"CONNECTED USERS ${stats.connectedUsers}")).fork
-    _    <- putStrLn(s"STARTING SERVER ON PORT $port")
-    _    <- Server.start(port, app)
+    port   <- system.envOrElse("PORT", "8088").map(_.toInt).orElseSucceed(8088)
+    _      <- SlideApp.populationStatsStream.foreach(stats => putStrLn(s"CONNECTED USERS ${stats.connectedUsers}")).fork
+    _      <- putStrLn(s"STARTING SERVER ON PORT $port")
+    config <- ZIO.service[Config]
+    _      <- Server.start(port, app(config.adminPassword))
   } yield ())
-    .provideCustomLayer(SlideApp.live)
+    .provideCustomLayer(SlideApp.live ++ Config.live)
     .exitCode
 }

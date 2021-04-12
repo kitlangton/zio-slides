@@ -2,8 +2,9 @@ name := "zio-slides"
 
 version := "0.1"
 
-val zioVersion     = "1.0.5+99-0699c11e-SNAPSHOT"
-val zioHttpVersion = "1.0.0.0-RC15+7-54a6202a-SNAPSHOT"
+val zioVersion       = "1.0.5+99-0699c11e-SNAPSHOT"
+val zioConfigVersion = "1.0.4"
+val zioHttpVersion   = "1.0.0.0-RC15+7-54a6202a-SNAPSHOT"
 
 val sharedSettings = Seq(
   addCompilerPlugin("org.typelevel" %% "kind-projector"     % "0.11.3" cross CrossVersion.full),
@@ -36,9 +37,11 @@ lazy val backend = project
     sharedSettings,
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
     libraryDependencies ++= Seq(
-      "io.github.kitlangton" %% "zio-magic" % "0.2.3",
-      "dev.zio"              %% "zio-test"  % zioVersion % Test,
-      "io.d11"               %% "zhttp"     % zioHttpVersion
+      "io.github.kitlangton" %% "zio-magic"           % "0.2.3",
+      "dev.zio"              %% "zio-config"          % zioConfigVersion,
+      "dev.zio"              %% "zio-config-magnolia" % zioConfigVersion,
+      "dev.zio"              %% "zio-test"            % zioVersion % Test,
+      "io.d11"               %% "zhttp"               % zioHttpVersion
     )
   )
   .dependsOn(shared)
