@@ -2,7 +2,7 @@ name := "zio-slides"
 
 version := "0.1"
 
-val zioVersion     = "1.0.5+98-e0a2da7b-SNAPSHOT"
+val zioVersion     = "1.0.5+99-0699c11e-SNAPSHOT"
 val zioHttpVersion = "1.0.0.0-RC15+7-54a6202a-SNAPSHOT"
 
 val sharedSettings = Seq(
@@ -53,7 +53,7 @@ lazy val frontend = project
     libraryDependencies ++= Seq(
       "com.raquo"         %%% "laminar"         % "0.12.2",
       "io.github.cquiroz" %%% "scala-java-time" % "2.2.1",
-      "io.laminext"       %%% "websocket"       % "0.12.2"
+      "io.laminext"       %%% "websocket"       % "0.13.0-M1"
     )
   )
   .settings(sharedSettings)

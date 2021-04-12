@@ -2,6 +2,7 @@ package zio.slides
 
 import zio._
 import zio.clock.Clock
+import zio.console.Console
 import zio.duration.durationInt
 import zio.slides.VoteState.{CastVoteId, UserId}
 import zio.stream._
@@ -19,14 +20,15 @@ trait SlideApp {
   def voteStream: UStream[Chunk[CastVoteId]]
   def populationStatsStream: UStream[PopulationStats]
 
-  def receive(id: UserId, appCommand: ClientCommand): UIO[Unit]
+  def receiveUserCommand(id: UserId, userCommand: UserCommand): UIO[Unit]
+  def receiveAdminCommand(adminCommand: AdminCommand): UIO[Unit]
 
   def userJoined: UIO[Unit]
   def userLeft: UIO[Unit]
 }
 
 object SlideApp {
-  val live: URLayer[Clock, Has[SlideApp]] = SlideAppLive.layer
+  val live: URLayer[Clock with Console, Has[SlideApp]] = SlideAppLive.layer
 
   // Accessor Methods
 
@@ -42,8 +44,11 @@ object SlideApp {
   def populationStatsStream: ZStream[Has[SlideApp], Nothing, PopulationStats] =
     ZStream.accessStream[Has[SlideApp]](_.get.populationStatsStream)
 
-  def receive(id: UserId, appCommand: ClientCommand): ZIO[Has[SlideApp], Nothing, Unit] =
-    ZIO.accessM[Has[SlideApp]](_.get.receive(id, appCommand))
+  def receiveUserCommand(id: UserId, userCommand: UserCommand): ZIO[Has[SlideApp], Nothing, Unit] =
+    ZIO.accessM[Has[SlideApp]](_.get.receiveUserCommand(id, userCommand))
+
+  def receiveAdminCommand(adminCommand: AdminCommand): ZIO[Has[SlideApp], Nothing, Unit] =
+    ZIO.accessM[Has[SlideApp]](_.get.receiveAdminCommand(adminCommand))
 
   def userJoined: ZIO[Has[SlideApp], Nothing, Unit] =
     ZIO.accessM[Has[SlideApp]](_.get.userJoined)
@@ -63,13 +68,7 @@ case class SlideAppLive(
     populationStatsStream: UStream[PopulationStats]
 ) extends SlideApp {
 
-  override def receive(id: UserId, appCommand: ClientCommand): UIO[Unit] =
-    (appCommand match {
-      case command: AdminCommand => receive(command)
-      case command: UserCommand  => receive(id, command)
-    })
-
-  private def receive(adminCommand: AdminCommand): UIO[Unit] =
+  def receiveAdminCommand(adminCommand: AdminCommand): UIO[Unit] =
     adminCommand match {
       case AdminCommand.NextSlide => slideStateRef.update(s => UIO(s.nextSlide))
       case AdminCommand.PrevSlide => slideStateRef.update(s => UIO(s.prevSlide))
@@ -79,10 +78,8 @@ case class SlideAppLive(
         questionStateRef.update(qs => UIO(qs.toggleQuestion(id)))
     }
 
-  private def receive(id: UserId, userCommand: UserCommand): UIO[Unit] =
+  def receiveUserCommand(id: UserId, userCommand: UserCommand): UIO[Unit] =
     userCommand match {
-      case UserCommand.ConnectionPlease() =>
-        ZIO.unit
       case UserCommand.AskQuestion(question, slideIndex) =>
         questionStateRef.update(qs => UIO(qs.askQuestion(question, slideIndex)))
       case UserCommand.SendVote(topic, vote) =>
@@ -97,22 +94,21 @@ case class SlideAppLive(
 }
 
 object SlideAppLive {
-  val layer: ZLayer[Clock, Nothing, Has[SlideApp]] = {
+  val layer: ZLayer[Clock with Console, Nothing, Has[SlideApp]] = {
     for {
       slideVar           <- SubscriptionRef.make(SlideState.empty).toManaged_
       questionsVar       <- SubscriptionRef.make(QuestionState.empty).toManaged_
-      populationStatsVar <- SubscriptionRef.make(PopulationStats.empty).toManaged_
+      populationStatsVar <- SubscriptionRef.make(PopulationStats(0)).toManaged_
 
       voteQueue  <- Queue.bounded[CastVoteId](256).toManaged_
-      voteStream <- ZStream.fromQueue(voteQueue).groupedWithin(100, 300.millis).broadcastDynamic(32)
-
+      voteStream <- ZStream.fromQueue(voteQueue).groupedWithin(100, 300.millis).broadcastDynamic(128)
     } yield SlideAppLive(
       slideStateRef = slideVar.ref,
       slideStateStream = slideVar.changes,
       questionStateRef = questionsVar.ref,
       questionStateStream = questionsVar.changes,
       voteQueue = voteQueue,
-      voteStream = ZStream.unwrapManaged(voteStream),
+      voteStream = voteStream,
       populationStatsRef = populationStatsVar.ref,
       populationStatsStream = populationStatsVar.changes
     )

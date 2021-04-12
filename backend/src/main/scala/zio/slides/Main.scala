@@ -11,6 +11,20 @@ import zio.slides.VoteState.UserId
 import zio.stream.ZStream
 
 object Main extends App {
+  def adminSocket: Socket[Has[SlideApp] with Console, Nothing] = {
+    val userId = UserId.random
+
+    Socket.collect { case WebSocketFrame.Text(text) =>
+      text.fromJson[AdminCommand] match {
+        case Left(error) =>
+          ZStream.fromEffect(putStrErr(s"DECODING ERROR $error")).drain
+        case Right(command) =>
+          println(s"RECEIVED ADMIN COMMAND: \n\t$userId \n\t$command")
+          ZStream.fromEffect(SlideApp.receiveAdminCommand(command)).drain
+      }
+    }
+  }
+
   def userSocket: Socket[Has[SlideApp] with Console, Nothing] = {
     val userId = UserId.random
 
@@ -31,12 +45,12 @@ object Main extends App {
     val handleClose = Socket.close { _ => SlideApp.userLeft }
 
     val handleCommand = Socket.collect { case WebSocketFrame.Text(text) =>
-      text.fromJson[ClientCommand] match {
+      text.fromJson[UserCommand] match {
         case Left(error) =>
           ZStream.fromEffect(putStrErr(s"DECODING ERROR $error")).drain
         case Right(command) =>
           println(s"RECEIVED COMMAND: \n\t$userId \n\t$command")
-          ZStream.fromEffect(SlideApp.receive(userId, command)).drain
+          ZStream.fromEffect(SlideApp.receiveUserCommand(userId, command)).drain
       }
     }
 
@@ -44,14 +58,23 @@ object Main extends App {
   }
 
   private val app: Http[Console with Has[SlideApp], Throwable] =
-    Http.collect { case Method.GET -> Root / "ws" =>
-      Response.socket(userSocket)
+    Http.collect {
+      case Method.GET -> Root / "ws" =>
+        Response.socket(userSocket)
+
+      case req @ Method.GET -> Root / "ws" / "admin" =>
+        req.url.query match {
+          case s"password=$password" if password == "hunter2" =>
+            Response.socket(adminSocket)
+          case _ =>
+            Response.fromHttpError(HttpError.Unauthorized("INVALID PASSWORD"))
+        }
     }
 
   override def run(args: List[String]): URIO[zio.ZEnv, ExitCode] = (for {
     port <- system.envOrElse("PORT", "8088").map(_.toInt).orElseSucceed(8088)
-    _    <- putStrLn(s"STARTING SERVER ON PORT $port")
     _    <- SlideApp.populationStatsStream.foreach(stats => putStrLn(s"CONNECTED USERS ${stats.connectedUsers}")).fork
+    _    <- putStrLn(s"STARTING SERVER ON PORT $port")
     _    <- Server.start(port, app)
   } yield ())
     .provideCustomLayer(SlideApp.live)

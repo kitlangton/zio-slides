@@ -11,8 +11,6 @@ case class PopulationStats(connectedUsers: Int) {
 }
 
 object PopulationStats {
-  def empty: PopulationStats = PopulationStats(1)
-
   implicit val codec: JsonCodec[PopulationStats] =
     DeriveJsonCodec.gen[PopulationStats]
 }

@@ -23,12 +23,12 @@ object SlideAppSpec extends DefaultRunnableSpec {
       testM("subscriptions are interruptible") {
         val total = 1000
         for {
-          _   <- SlideApp.receive(UserId("admin"), AdminCommand.NextStep).forever.fork
+          _   <- SlideApp.receiveAdminCommand(AdminCommand.NextStep).forever.fork
           _   <- Live.live(ZIO.sleep(1.seconds))
           ref <- Ref.make(0)
           reportFinish = ref.getAndUpdate(_ + 1).flatMap(i => putStrLn(s"FINISHED $i / $total"))
           all <- ZIO.collectAllPar(List.fill(total)(simulateUser <* reportFinish))
         } yield assert(all.map { case (i, i1) => i == i1 })(forall(isTrue))
       }
-    ).provideCustomLayerShared(SlideApp.live) @@ TestAspect.timed
+    ).provideCustomLayer(SlideApp.live) // @@ TestAspect.silent
 }

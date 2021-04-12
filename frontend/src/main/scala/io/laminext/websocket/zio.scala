@@ -3,7 +3,7 @@ import _root_.zio.json._
 
 object zio {
 
-  implicit class WebSocketReceiveBuilderCirceOps(b: WebSocketReceiveBuilder) {
+  implicit class WebSocketReceiveBuilderZioOps(b: WebSocketReceiveBuilder) {
     @inline def json[Receive, Send](implicit
         receiveDecoder: JsonDecoder[Receive],
         sendEncoder: JsonEncoder[Send]

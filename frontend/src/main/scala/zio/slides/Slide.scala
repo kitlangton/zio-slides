@@ -1,7 +1,7 @@
 package zio.slides
 
 import com.raquo.laminar.api.L._
-import zio.slides.Slides.VotesView
+import zio.slides.VoteModule.VotesView
 
 trait Slide {
   def render($step: Signal[Int]): HtmlElement
