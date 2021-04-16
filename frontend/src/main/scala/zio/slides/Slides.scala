@@ -181,7 +181,9 @@ object Slides {
           div(
             fontSize("16px"),
             lineHeight("1.5"),
-            "ZYMPOSIUM",
+            div(
+              "ZYMPOSIUM"
+            ),
             onDblClick --> { _ =>
               val state = slideStateVar.now()
               isAskingVar.update {

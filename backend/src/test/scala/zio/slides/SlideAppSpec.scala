@@ -11,12 +11,12 @@ import zio.test._
 
 object SlideAppSpec extends DefaultRunnableSpec {
   def simulateUser: ZIO[Has[SlideApp] with Random with Console, Nothing, TestResult] = for {
-    _            <- putStrLn("STARTING")
-    delay        <- random.nextIntBetween(0, 3)
-    amountToTake <- random.nextIntBetween(2, 5000).delay(delay.seconds).provideSomeLayer[Random](Clock.live)
-    taken        <- SlideApp.slideStateStream.take(amountToTake).runCollect.map(_.map(_.slideIndex))
-    expected = Chunk.fromIterable(taken.head to taken.last)
-  } yield assert(taken)(equalTo(expected))
+    _                    <- putStrLn("STARTING")
+    delay                <- random.nextIntBetween(0, 3)
+    amountToTake         <- random.nextIntBetween(2, 5000).delay(delay.seconds).provideSomeLayer[Random](Clock.live)
+    receivedSlideIndices <- SlideApp.slideStateStream.take(amountToTake).runCollect.map(_.map(_.slideIndex))
+    expected = Chunk.fromIterable(receivedSlideIndices.min to receivedSlideIndices.max)
+  } yield assert(receivedSlideIndices)(equalTo(expected))
 
   def spec: ZSpec[Environment, Failure] =
     suite("SlideAppSpec")(

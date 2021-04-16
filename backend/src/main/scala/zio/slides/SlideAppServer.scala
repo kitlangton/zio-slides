@@ -88,6 +88,5 @@ object SlideAppServer extends App {
         }
       case other =>
         ZStream.fromEffect(UIO(println(s"RECEIVED $other"))).drain
-
     }
 }
