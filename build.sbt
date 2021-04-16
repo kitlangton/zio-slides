@@ -2,7 +2,7 @@ name := "zio-slides"
 
 version := "0.1"
 
-val animusVersion    = "0.1.5+6-ceaea93a+20210415-1645-SNAPSHOT"
+val animusVersion    = "0.1.6+1-8b00e916-SNAPSHOT"
 val laminarVersion   = "0.12.2"
 val zioConfigVersion = "1.0.4"
 val zioHttpVersion   = "1.0.0.0-RC15+7-54a6202a-SNAPSHOT"
@@ -26,11 +26,6 @@ val sharedSettings = Seq(
 )
 
 scalacOptions ++= Seq("-Ymacro-annotations", "-Xfatal-warnings")
-
-//resolvers ++= Seq(
-//  "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots",
-//  "Sonatype OSS Snapshots s01" at "https://s01.oss.sonatype.org/content/repositories/snapshots"
-//)
 
 lazy val backend = project
   .in(file("backend"))
