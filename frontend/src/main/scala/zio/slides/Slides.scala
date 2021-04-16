@@ -5,6 +5,7 @@ import io.laminext.websocket._
 import io.laminext.websocket.zio._
 import _root_.zio.slides.State._
 import _root_.zio.slides.Styles._
+import animus._
 
 import scala.concurrent.duration.DurationInt
 
@@ -124,60 +125,109 @@ object Slides {
       )
     )
 
-  def view: Div = div(
-    ws.connect,
-    VoteModule.voteBus.events.debounce(500) --> { vote =>
-      println(s"SENDING VOTE $vote ")
-      ws.sendOne(vote)
-    },
-    ws.received --> { command =>
-      println(s"RECEIVED COMMAND: $command")
-      command match {
-        case ServerCommand.SendSlideState(slideState) =>
-          slideStateVar.set(slideState)
-        case ServerCommand.SendQuestionState(questionState) =>
-          questionStateVar.set(questionState)
-        case ServerCommand.SendVotes(votes) =>
-          voteStateVar.update(_.processUpdates(votes.filterNot(v => userIdVar.now().contains(v.id))))
-        case ServerCommand.SendUserId(id) =>
-          userIdVar.set(Some(id))
-        case ServerCommand.SendPopulationStats(populationStats) =>
-          populationStatsVar.set(populationStats)
-      }
-    },
-    BottomPanel,
-    textAlign.center,
+  lazy val $connectionStatus = ws.isConnected
+    .combineWithFn(ws.isConnecting) {
+      case (true, _) => "CONNECTED"
+      case (_, true) => "CONNECTING"
+      case _         => "OFFLINE"
+    }
+
+  def view: Div = {
     div(
-      position.relative,
-      position.fixed,
-      top("0"),
-      bottom("0"),
-      left("0"),
-      right("0"),
-      background("#111"),
-      cls <-- isAskingVar.signal
-        .map(_.isDefined)
-        .combineWithFn(questionStateVar.signal.map(_.activeQuestion.isDefined))(_ || _)
-        .map { if (_) "slide-app-shrink" else "slide-app" },
-      pre(
-        "Zymposium — ",
-        child.text <-- populationStatsVar.signal.map(_.connectedUsers.toString),
-        onDblClick --> { _ =>
-          val state = slideStateVar.now()
-          isAskingVar.update {
-            case Some(_) => None
-            case None    => Some(SlideIndex(state.slideIndex, state.stepIndex))
-          }
+      ws.connect,
+      VoteModule.voteBus.events.debounce(500) --> { vote =>
+        println(s"SENDING VOTE $vote ")
+        ws.sendOne(vote)
+      },
+      ws.received --> { command =>
+        println(s"RECEIVED COMMAND: $command")
+        command match {
+          case ServerCommand.SendSlideState(slideState) =>
+            slideStateVar.set(slideState)
+          case ServerCommand.SendQuestionState(questionState) =>
+            questionStateVar.set(questionState)
+          case ServerCommand.SendVotes(votes) =>
+            voteStateVar.update(_.processUpdates(votes.filterNot(v => userIdVar.now().contains(v.id))))
+          case ServerCommand.SendUserId(id) =>
+            userIdVar.set(Some(id))
+          case ServerCommand.SendPopulationStats(populationStats) =>
+            populationStatsVar.set(populationStats)
         }
-      ),
-      renderSlides
+      },
+      BottomPanel,
+      textAlign.center,
+      div(
+        position.relative,
+        position.fixed,
+        top("0"),
+        bottom("0"),
+        left("0"),
+        right("0"),
+        background("#111"),
+        cls <-- isAskingVar.signal
+          .map(_.isDefined)
+          .combineWithFn(questionStateVar.signal.map(_.activeQuestion.isDefined))(_ || _)
+          .map {
+            if (_) "slide-app-shrink" else "slide-app"
+          },
+        div(
+          margin("20px"),
+          display.flex,
+          flexDirection.column,
+          height("40px"),
+          //        justifyContent.spaceBetween,
+          alignItems.flexEnd,
+          div(
+            fontSize("16px"),
+            lineHeight("1.5"),
+            "ZYMPOSIUM",
+            onDblClick --> { _ =>
+              val state = slideStateVar.now()
+              isAskingVar.update {
+                case Some(_) => None
+                case None    => Some(SlideIndex(state.slideIndex, state.stepIndex))
+              }
+            }
+          ),
+          div(
+            fontSize("14px"),
+            opacity(0.7),
+            div(
+              lineHeight("1.5"),
+              display.flex,
+              children <-- $connectionStatus.splitOneTransition(identity) { (_, string, _, transition) =>
+                div(string, transition.width, transition.opacity)
+              },
+              overflowY.hidden,
+              height <-- EventStream
+                .merge(
+                  $connectionStatus.changes.debounce(5000).mapTo(false),
+                  $connectionStatus.changes.mapTo(true)
+                )
+                .toSignal(false)
+                .map { if (_) 20.0 else 0.0 }
+                .spring
+                .px
+            )
+          ),
+          div(
+            opacity <-- Animation.from(0).wait(1000).to(1).run,
+            lineHeight("1.5"),
+            display.flex,
+            height("40px"),
+            fontSize("14px"),
+            div(s"POP.${nbsp}", opacity(0.7)),
+            AnimatedCount(populationStatsVar.signal.map(_.connectedUsers))
+          )
+        ),
+        renderSlides
+      )
     )
-  )
+  }
 
   val $slideState: Signal[SlideState] = slideStateVar.signal.combineWithFn(slideIndexOverride) {
-    case (ss, Some(SlideIndex(slide, step))) =>
-      ss.copy(slide, ss.slideStepMap.updated(slide, step))
-    case (ss, None) => ss
+    case (ss, Some(SlideIndex(slide, step))) => ss.copy(slide, ss.slideStepMap.updated(slide, step))
+    case (ss, None)                          => ss
   }
 
   def renderSlides: Div = div(
@@ -205,68 +255,4 @@ object Slides {
       )
     }
   )
-}
-
-object VoteModule {
-  lazy val voteBus: EventBus[UserCommand.SendVote] = new EventBus
-
-  lazy val exampleOptions: List[String] = List(
-    "Full Stack Architecture",
-    "Scala.js & Laminar",
-    "WebSocket Communication",
-    ""
-  )
-
-  lazy val exampleTopic: VoteState.Topic = VoteState.Topic("Scala-Topic")
-
-  def VotesView(topic: VoteState.Topic = exampleTopic, options: List[String] = exampleOptions): Div =
-    div(
-      options.map { string =>
-        VoteView(topic, VoteState.Vote(string))
-      }
-    )
-
-  private def VoteView(topic: VoteState.Topic, vote: VoteState.Vote) = {
-    val $totalVotes        = voteStateVar.signal.map(_.voteTotals(topic).getOrElse(vote, 0))
-    val $numberOfCastVotes = voteStateVar.signal.map(_.voteTotals(topic).values.sum)
-
-    val $votePercentage = $totalVotes.combineWithFn($numberOfCastVotes) { (votes, all) =>
-      if (all == 0) 0.0
-      else votes.toDouble / all.toDouble
-    }
-
-    div(
-      padding("8px"),
-      border("1px solid #444"),
-      position.relative,
-      background("#223"),
-      div(
-        cls("vote-vote"),
-        position.absolute,
-        zIndex(1),
-        left("0"),
-        top("0"),
-        right("0"),
-        width <-- $votePercentage.map(d => s"${d * 100}%"),
-        bottom("0"),
-        background("blue")
-      ),
-      div(
-        position.relative,
-        vote.string,
-        " ",
-        span(
-          opacity(0.6),
-          child.text <-- $totalVotes
-        ),
-        zIndex(2)
-      ),
-      onMouseEnter --> { _ =>
-        voteBus.emit(UserCommand.SendVote(topic, vote))
-        userIdVar.now().foreach { userId =>
-          voteStateVar.update(_.processUpdate(VoteState.CastVoteId(userId, topic, vote)))
-        }
-      }
-    )
-  }
 }

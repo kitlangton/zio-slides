@@ -9,18 +9,6 @@ import zio.json.{DecoderOps, EncoderOps}
 import zio.slides.ServerCommand.{SendPopulationStats, SendQuestionState, SendSlideState, SendUserId, SendVotes}
 import zio.slides.VoteState.UserId
 import zio.stream.ZStream
-import zio.config._
-import zio.config.magnolia._
-
-case class Config(adminPassword: String)
-
-object Config {
-  val descriptor: ConfigDescriptor[Config] =
-    DeriveConfigDescriptor.descriptor[Config]
-
-  val live: ZLayer[system.System, Nothing, Has[Config]] =
-    (ZConfig.fromPropertiesFile("../application.conf", descriptor) orElse ZConfig.fromSystemEnv(descriptor)).orDie
-}
 
 object Main extends App {
   def adminSocket: Socket[Has[SlideApp] with Console, Nothing] = {
@@ -40,19 +28,20 @@ object Main extends App {
   def userSocket: Socket[Has[SlideApp] with Console, Nothing] = {
     val userId = UserId.random
 
-    val handleOpen = Socket.open { _ =>
-      ZStream.fromEffect(putStrLn(s"RECEIVED NEW CONNECTION: \n\t$userId")) *>
-        ZStream
-          .mergeAllUnbounded()(
-            ZStream.fromEffect(SlideApp.userJoined).drain,
-            SlideApp.slideStateStream.map(SendSlideState),
-            SlideApp.questionStateStream.map(SendQuestionState),
-            SlideApp.voteStream.map(SendVotes),
-            SlideApp.populationStatsStream.map(SendPopulationStats),
-            ZStream.succeed[ServerCommand](SendUserId(userId))
-          )
-          .map(s => WebSocketFrame.text(s.toJson))
-    }
+    val handleOpen =
+      Socket.open { _ =>
+        ZStream.fromEffect(putStrLn(s"RECEIVED NEW CONNECTION: \n\t$userId")) *>
+          ZStream
+            .mergeAllUnbounded()(
+              ZStream.fromEffect(SlideApp.userJoined).drain,
+              SlideApp.slideStateStream.map(SendSlideState),
+              SlideApp.questionStateStream.map(SendQuestionState),
+              SlideApp.voteStream.map(SendVotes),
+              SlideApp.populationStatsStream.map(SendPopulationStats),
+              ZStream.succeed[ServerCommand](SendUserId(userId))
+            )
+            .map(s => WebSocketFrame.text(s.toJson))
+      }
 
     val handleClose = Socket.close { _ => SlideApp.userLeft }
 
