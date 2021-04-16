@@ -39,8 +39,7 @@ object SlideAppServer extends App {
             )
             .map { s =>
               val bytes: ByteBuffer = Pickle.intoBytes(s)
-              println(s"piclked $s into $bytes")
-              val byteBuf = Unpooled.wrappedBuffer(bytes)
+              val byteBuf           = Unpooled.wrappedBuffer(bytes)
               WebSocketFrame.binary(ByteBuf(byteBuf))
             }
       }
@@ -83,10 +82,8 @@ object SlideAppServer extends App {
       case WebSocketFrame.Binary(bytes) =>
         Try(Unpickle[A].fromBytes(bytes.asJava.nioBuffer())) match {
           case Failure(error) =>
-            println(s"FAILED $error from $bytes")
             ZStream.fromEffect(putStrErr(s"Decoding Error: $error")).drain
           case Success(command) =>
-            println(s"unpiclked $command from $bytes")
             f(command)
         }
       case other =>

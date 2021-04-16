@@ -102,8 +102,6 @@ object SlideAppLive {
 
       voteQueue  <- Queue.bounded[CastVoteId](256).toManaged_
       voteStream <- ZStream.fromQueue(voteQueue).groupedWithin(100, 300.millis).broadcastDynamic(128)
-
-      clock <- ZManaged.environment[Clock]
     } yield SlideAppLive(
       slideStateRef = slideVar.ref,
       slideStateStream = slideVar.changes,
@@ -112,7 +110,7 @@ object SlideAppLive {
       voteQueue = voteQueue,
       voteStream = voteStream,
       populationStatsRef = populationStatsVar.ref,
-      populationStatsStream = populationStatsVar.changes.debounce(500.millis).provide(clock)
+      populationStatsStream = populationStatsVar.changes
     )
   }.toLayer
 }
