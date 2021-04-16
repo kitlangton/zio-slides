@@ -2,16 +2,17 @@ package zio.slides
 
 import com.raquo.laminar.api.L._
 import io.laminext.websocket.WebSocket
-import io.laminext.websocket.zio._
+import io.laminext.websocket.boopickle._
 import org.scalajs.dom.ext.LocalStorage
 import zio.slides.State.{questionStateVar, slideStateVar}
 import zio.slides.Styles.panelStyles
+import boopickle.Default._
 
 object Admin {
   val adminWs: WebSocket[ServerCommand, AdminCommand] =
     WebSocket
       .url(Config.webSocketsUrl + s"/admin?password=${LocalStorage("password").getOrElse("")}")
-      .json[ServerCommand, AdminCommand]
+      .pickle[ServerCommand, AdminCommand]
       .build(reconnectRetries = 0)
 
   def AdminPanel: Div =

@@ -5,15 +5,20 @@ import zhttp.service._
 import zhttp.socket._
 import zio._
 import zio.console._
-import zio.json._
 import zio.slides.ServerCommand._
 import zio.slides.VoteState.UserId
 import zio.stream.ZStream
+import boopickle.Default._
+import io.netty.buffer.Unpooled
+import zhttp.core.ByteBuf
 
-object Main extends App {
+import java.nio.ByteBuffer
+import scala.util.{Failure, Success, Try}
+
+object SlideAppServer extends App {
 
   def adminSocket: Socket[Has[SlideApp] with Console, Nothing] =
-    jsonSocket { (command: AdminCommand) =>
+    pickleSocket { (command: AdminCommand) =>
       ZStream.fromEffect(SlideApp.receiveAdminCommand(command)).drain
     }
 
@@ -32,12 +37,17 @@ object Main extends App {
               SlideApp.populationStatsStream.map(SendPopulationStats),
               ZStream.succeed[ServerCommand](SendUserId(userId))
             )
-            .map(s => WebSocketFrame.text(s.toJson))
+            .map { s =>
+              val bytes: ByteBuffer = Pickle.intoBytes(s)
+              println(s"piclked $s into $bytes")
+              val byteBuf = Unpooled.wrappedBuffer(bytes)
+              WebSocketFrame.binary(ByteBuf(byteBuf))
+            }
       }
 
     val handleClose = Socket.close { _ => SlideApp.userLeft }
 
-    val handleCommand = jsonSocket { (command: UserCommand) =>
+    val handleCommand = pickleSocket { (command: UserCommand) =>
       ZStream.fromEffect(SlideApp.receiveUserCommand(userId, command)).drain
     }
 
@@ -68,13 +78,19 @@ object Main extends App {
     .provideCustomLayer(SlideApp.live ++ Config.live)
     .exitCode
 
-  private def jsonSocket[R, E, A: JsonDecoder](f: A => ZStream[R, E, WebSocketFrame]): Socket[Console with R, E] =
-    Socket.collect { case WebSocketFrame.Text(text) =>
-      text.fromJson[A] match {
-        case Left(error) =>
-          ZStream.fromEffect(putStrErr(s"Decoding Error: $error")).drain
-        case Right(command) =>
-          f(command)
-      }
+  private def pickleSocket[R, E, A: Pickler](f: A => ZStream[R, E, WebSocketFrame]): Socket[Console with R, E] =
+    Socket.collect {
+      case WebSocketFrame.Binary(bytes) =>
+        Try(Unpickle[A].fromBytes(bytes.asJava.nioBuffer())) match {
+          case Failure(error) =>
+            println(s"FAILED $error from $bytes")
+            ZStream.fromEffect(putStrErr(s"Decoding Error: $error")).drain
+          case Success(command) =>
+            println(s"unpiclked $command from $bytes")
+            f(command)
+        }
+      case other =>
+        ZStream.fromEffect(UIO(println(s"RECEIVED $other"))).drain
+
     }
 }

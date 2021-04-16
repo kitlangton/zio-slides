@@ -1,18 +1,11 @@
 package zio.slides
 
-import zio.json._
-
 case class PopulationStats(connectedUsers: Int) {
   def addOne: PopulationStats =
     copy(connectedUsers = connectedUsers + 1)
 
   def removeOne: PopulationStats =
     copy(connectedUsers = connectedUsers - 1)
-}
-
-object PopulationStats {
-  implicit val codec: JsonCodec[PopulationStats] =
-    DeriveJsonCodec.gen[PopulationStats]
 }
 
 case class SlideState(slideIndex: Int, slideStepMap: Map[Int, Int]) {
@@ -39,12 +32,4 @@ object SlideState {
     val randomStep  = scala.util.Random.nextInt(3)
     SlideState(randomSlide, Map(randomSlide -> randomStep))
   }
-
-  // Codecs
-
-  implicit val intMapEncoder: JsonFieldEncoder[Int]  = JsonFieldEncoder.string.contramap[Int](_.toString)
-  implicit val intMapDecoder: JsonFieldDecoder[Int]  = JsonFieldDecoder.string.map(_.toIntOption.getOrElse(0))
-  implicit val intMapCodec: JsonCodec[Map[Int, Int]] = JsonCodec.map[Int, Int]
-
-  implicit val codec: JsonCodec[SlideState] = DeriveJsonCodec.gen[SlideState]
 }

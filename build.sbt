@@ -17,9 +17,9 @@ val sharedSettings = Seq(
     "Sonatype OSS Snapshots s01" at "https://s01.oss.sonatype.org/content/repositories/snapshots"
   ),
   libraryDependencies ++= Seq(
+    "io.suzaku"    %%% "boopickle"     % "1.3.2",
     "dev.zio"      %%% "zio"           % zioVersion,
     "dev.zio"      %%% "zio-streams"   % zioVersion,
-    "dev.zio"      %%% "zio-json"      % "0.1.4",
     "org.scala-lang" % "scala-reflect" % scalaVersion.value % Provided
   ),
   scalaVersion := "2.13.5"

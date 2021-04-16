@@ -1,7 +1,5 @@
 package zio.slides
 
-import zio.json.{DeriveJsonCodec, JsonCodec, JsonDecoder, JsonEncoder}
-
 import java.util.UUID
 
 case class QuestionState(
@@ -11,17 +9,14 @@ case class QuestionState(
 
   def activeQuestion: Option[Question] = questions.find(q => activeQuestionId.contains(q.id))
 
-  def toggleQuestion(uuid: UUID): QuestionState =
-    if (activeQuestionId.contains(uuid)) copy(activeQuestionId = None)
-    else copy(activeQuestionId = Some(uuid))
+  def toggleQuestion(qid: UUID): QuestionState =
+    if (activeQuestionId.contains(qid)) copy(activeQuestionId = None)
+    else copy(activeQuestionId = Some(qid))
 
   def askQuestion(question: String, slideIndex: SlideIndex): QuestionState =
     copy(questions = questions.appended(Question(question, slideIndex)))
 }
 
 object QuestionState {
-
   def empty: QuestionState = QuestionState()
-
-  implicit val codec: JsonCodec[QuestionState] = DeriveJsonCodec.gen[QuestionState]
 }

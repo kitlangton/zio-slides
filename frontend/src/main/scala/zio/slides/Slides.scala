@@ -1,11 +1,12 @@
 package zio.slides
 
-import com.raquo.laminar.api.L._
-import io.laminext.websocket._
-import io.laminext.websocket.zio._
+import _root_.boopickle.Default._
 import _root_.zio.slides.State._
 import _root_.zio.slides.Styles._
 import animus._
+import com.raquo.laminar.api.L._
+import io.laminext.websocket._
+import io.laminext.websocket.boopickle.WebSocketReceiveBuilderBooPickleOps
 
 import scala.concurrent.duration.DurationInt
 
@@ -20,7 +21,7 @@ object Slides {
   val ws: WebSocket[ServerCommand, UserCommand] =
     WebSocket
       .url(Config.webSocketsUrl)
-      .json[ServerCommand, UserCommand]
+      .pickle[ServerCommand, UserCommand]
       .build(reconnectRetries = Int.MaxValue, reconnectDelay = 3.seconds)
 
   val slideIndexOverride: Var[Option[SlideIndex]] = Var(None)
