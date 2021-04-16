@@ -2,18 +2,9 @@ package zio.slides
 
 import zio.Chunk
 import zio.json.{DeriveJsonCodec, JsonCodec}
-import zio.slides.VoteState.{CastVoteId, Topic, UserId, Vote, VoteMap}
+import zio.slides.VoteState.{CastVoteId, Topic, Vote, VoteMap}
 
 import java.util.UUID
-
-// user A
-// user B
-// user C
-
-// topic FavoriteLanguage
-// topic DoYouLikeMe?
-//       yes
-//       no
 
 case class VoteState private (map: VoteMap) { self =>
   def processUpdates(votes: Chunk[CastVoteId]): VoteState =
@@ -32,9 +23,6 @@ case class VoteState private (map: VoteMap) { self =>
 }
 
 object VoteState {
-  // Debounce on the Frontend
-  // Debounce on the Server / Coalesce votes
-
   def empty: VoteState = new VoteState(Map.empty)
 
   case class CastVote(topic: Topic, vote: Vote)

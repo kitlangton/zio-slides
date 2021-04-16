@@ -4,26 +4,18 @@ import zhttp.http._
 import zhttp.service._
 import zhttp.socket._
 import zio._
-import zio.console.{Console, putStrErr, putStrLn}
-import zio.json.{DecoderOps, EncoderOps}
-import zio.slides.ServerCommand.{SendPopulationStats, SendQuestionState, SendSlideState, SendUserId, SendVotes}
+import zio.console._
+import zio.json._
+import zio.slides.ServerCommand._
 import zio.slides.VoteState.UserId
 import zio.stream.ZStream
 
 object Main extends App {
-  def adminSocket: Socket[Has[SlideApp] with Console, Nothing] = {
-    val userId = UserId.random
 
-    Socket.collect { case WebSocketFrame.Text(text) =>
-      text.fromJson[AdminCommand] match {
-        case Left(error) =>
-          ZStream.fromEffect(putStrErr(s"DECODING ERROR $error")).drain
-        case Right(command) =>
-          println(s"RECEIVED ADMIN COMMAND: \n\t$userId \n\t$command")
-          ZStream.fromEffect(SlideApp.receiveAdminCommand(command)).drain
-      }
+  def adminSocket: Socket[Has[SlideApp] with Console, Nothing] =
+    jsonSocket { (command: AdminCommand) =>
+      ZStream.fromEffect(SlideApp.receiveAdminCommand(command)).drain
     }
-  }
 
   def userSocket: Socket[Has[SlideApp] with Console, Nothing] = {
     val userId = UserId.random
@@ -45,14 +37,8 @@ object Main extends App {
 
     val handleClose = Socket.close { _ => SlideApp.userLeft }
 
-    val handleCommand = Socket.collect { case WebSocketFrame.Text(text) =>
-      text.fromJson[UserCommand] match {
-        case Left(error) =>
-          ZStream.fromEffect(putStrErr(s"DECODING ERROR $error")).drain
-        case Right(command) =>
-          println(s"RECEIVED COMMAND: \n\t$userId \n\t$command")
-          ZStream.fromEffect(SlideApp.receiveUserCommand(userId, command)).drain
-      }
+    val handleCommand = jsonSocket { (command: UserCommand) =>
+      ZStream.fromEffect(SlideApp.receiveUserCommand(userId, command)).drain
     }
 
     handleCommand <+> handleOpen <+> handleClose
@@ -81,4 +67,14 @@ object Main extends App {
   } yield ())
     .provideCustomLayer(SlideApp.live ++ Config.live)
     .exitCode
+
+  private def jsonSocket[R, E, A: JsonDecoder](f: A => ZStream[R, E, WebSocketFrame]): Socket[Console with R, E] =
+    Socket.collect { case WebSocketFrame.Text(text) =>
+      text.fromJson[A] match {
+        case Left(error) =>
+          ZStream.fromEffect(putStrErr(s"Decoding Error: $error")).drain
+        case Right(command) =>
+          f(command)
+      }
+    }
 }

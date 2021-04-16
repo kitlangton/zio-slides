@@ -4,6 +4,7 @@ import animus._
 import com.raquo.laminar.api.L._
 import zio.slides.VoteModule.VotesView
 import components.FadeInWords
+import zio.json.JsonCodec
 
 trait Slide {
   def render($step: Signal[Int]): HtmlElement

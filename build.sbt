@@ -2,7 +2,7 @@ name := "zio-slides"
 
 version := "0.1"
 
-val animusVersion    = "0.1.6+1-8b00e916-SNAPSHOT"
+val animusVersion    = "0.1.6"
 val laminarVersion   = "0.12.2"
 val zioConfigVersion = "1.0.4"
 val zioHttpVersion   = "1.0.0.0-RC15+7-54a6202a-SNAPSHOT"
