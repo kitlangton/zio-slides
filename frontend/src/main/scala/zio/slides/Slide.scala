@@ -42,6 +42,7 @@ object Slide {
             .splitOneTransition(identity) { (_, word, _, transition) =>
               div(
                 display.inlineFlex,
+                overflow.hidden,
                 div(word),
                 Transitions.widthDynamic(transition.$isActive)
 //                transition.width
