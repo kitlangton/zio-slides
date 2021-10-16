@@ -84,6 +84,8 @@ case class SlideAppLive(
         questionStateRef.update(qs => UIO(qs.askQuestion(question, slideIndex)))
       case UserCommand.SendVote(topic, vote) =>
         voteQueue.offer(CastVoteId(id, topic, vote)).unit
+      case UserCommand.Subscribe =>
+        UIO.unit
     }
 
   override def userLeft: UIO[Unit] =

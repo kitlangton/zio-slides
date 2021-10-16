@@ -7,6 +7,7 @@ sealed trait ClientCommand
 sealed trait UserCommand extends ClientCommand
 
 object UserCommand {
+  case object Subscribe                                             extends UserCommand
   case class AskQuestion(question: String, slideIndex: SlideIndex)  extends UserCommand
   case class SendVote(topic: VoteState.Topic, vote: VoteState.Vote) extends UserCommand
 }

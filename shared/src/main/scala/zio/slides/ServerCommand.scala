@@ -10,5 +10,4 @@ object ServerCommand {
   case class SendVotes(votes: Chunk[VoteState.CastVoteId])         extends ServerCommand
   case class SendUserId(id: VoteState.UserId)                      extends ServerCommand
   case class SendPopulationStats(populationStats: PopulationStats) extends ServerCommand
-
 }

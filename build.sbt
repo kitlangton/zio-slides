@@ -2,11 +2,11 @@ name := "zio-slides"
 
 version := "0.1"
 
-val animusVersion    = "0.1.6"
-val laminarVersion   = "0.12.2"
+val animusVersion    = "0.1.9"
+val laminarVersion   = "0.13.0"
 val zioConfigVersion = "1.0.4"
-val zioHttpVersion   = "1.0.0.0-RC15+7-54a6202a-SNAPSHOT"
-val zioVersion       = "1.0.5+99-0699c11e-SNAPSHOT"
+val zioHttpVersion   = "1.0.0.0-RC17"
+val zioVersion       = "1.0.12"
 
 val sharedSettings = Seq(
   addCompilerPlugin("org.typelevel" %% "kind-projector"     % "0.11.3" cross CrossVersion.full),

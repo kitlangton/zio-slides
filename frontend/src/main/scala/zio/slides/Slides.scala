@@ -136,6 +136,9 @@ object Slides {
   def view: Div = {
     div(
       ws.connect,
+      ws.connected --> { _ =>
+        ws.sendOne(UserCommand.Subscribe)
+      },
       VoteModule.voteBus.events.debounce(500) --> { vote =>
         println(s"SENDING VOTE $vote ")
         ws.sendOne(vote)
