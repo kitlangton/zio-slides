@@ -1,6 +1,5 @@
 package zio.slides
 
-import zio.Chunk
 import zio.slides.VoteState.{CastVoteId, Topic, Vote, VoteMap}
 
 import java.util.UUID

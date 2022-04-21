@@ -1,7 +1,6 @@
 package zio.slides
 
 import boopickle.Default._
-import io.netty.buffer.Unpooled
 import zhttp.http._
 import zhttp.service._
 import zhttp.socket._
@@ -11,7 +10,6 @@ import zio.slides.VoteState.UserId
 import zio.stream.ZStream
 
 import java.nio.ByteBuffer
-import scala.jdk.CollectionConverters.SeqHasAsJava
 import scala.util.{Failure, Success, Try}
 
 object SlideAppServer extends ZIOAppDefault {

@@ -3,7 +3,6 @@ package zio.slides
 import zio._
 import zio.config._
 import zio.config.magnolia._
-import zio.System
 
 case class Config(adminPassword: String)
 

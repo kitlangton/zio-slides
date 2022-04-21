@@ -1,6 +1,5 @@
 package zio.slides
 
-import zio.Chunk
 
 sealed trait ServerCommand
 

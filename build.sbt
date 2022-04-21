@@ -21,7 +21,7 @@ inThisBuild(
 val sharedSettings = Seq(
   addCompilerPlugin("org.typelevel" %% "kind-projector"     % "0.13.2" cross CrossVersion.full),
   addCompilerPlugin("com.olegpy"    %% "better-monadic-for" % "0.3.1"),
-  scalacOptions ++= Seq("-Ymacro-annotations", "-Xfatal-warnings"),
+  scalacOptions ++= Seq("-Ymacro-annotations", "-Xfatal-warnings", "-Wunused"),
   resolvers ++= Seq(
     "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots",
     "Sonatype OSS Snapshots s01" at "https://s01.oss.sonatype.org/content/repositories/snapshots"

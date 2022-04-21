@@ -1,10 +1,8 @@
 package zio.slides
 
 import zio._
-import zio.Clock
 import zio.slides.VoteState.{CastVoteId, UserId}
 import zio.stream._
-import zio.Console
 
 /** Improvements:
   *
