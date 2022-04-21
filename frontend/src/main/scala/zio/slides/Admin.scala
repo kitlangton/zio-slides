@@ -9,7 +9,7 @@ import zio.slides.State.{questionStateVar, slideStateVar}
 import zio.slides.Styles.panelStyles
 
 object Admin {
-  lazy val localStoragePassword = scala.util.Try(window.localStorage.getItem("password")).toOption
+  lazy val localStoragePassword = Option(window.localStorage.getItem("password"))
 
   val adminWs: WebSocket[ServerCommand, AdminCommand] =
     WebSocket

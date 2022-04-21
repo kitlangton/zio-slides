@@ -85,8 +85,10 @@ case class SlideAppLive(
         UIO.unit
     }
 
-  override def userLeft: UIO[Unit] =
+  override def userLeft: UIO[Unit] = {
+    println("USER LEFT CALLED!")
     populationStatsRef.update(_.removeOne)
+  }
 
   override def userJoined: UIO[Unit] =
     populationStatsRef.update(_.addOne)

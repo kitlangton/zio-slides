@@ -139,7 +139,7 @@ object Slides {
       ws.connected --> { _ =>
         ws.sendOne(UserCommand.Subscribe)
       },
-      VoteModule.voteBus.events.debounce(500) --> { vote =>
+      VoteModule.voteBus.events.debounce(200) --> { vote =>
         println(s"SENDING VOTE $vote ")
         ws.sendOne(vote)
       },

@@ -14,65 +14,77 @@ import scala.util.{Failure, Success, Try}
 
 object SlideAppServer extends ZIOAppDefault {
 
-  def adminSocket: SocketApp[SlideApp] = {
-    pickleSocket { (command: AdminCommand) =>
-      ZStream.fromZIO(SlideApp.receiveAdminCommand(command)).drain
-    }
-  }
-
-  def userSocket: SocketApp[SlideApp] = {
-    val userId = UserId.random
-
-    val handleCommand = pickleSocket { (command: UserCommand) =>
-      command match {
-        case UserCommand.Subscribe =>
-          ZStream
-            .mergeAllUnbounded()(
-              ZStream.fromZIO(SlideApp.userJoined).drain,
-              SlideApp.slideStateStream.map(SendSlideState),
-              SlideApp.questionStateStream.map(SendQuestionState),
-              SlideApp.voteStream.map(SendVotes),
-              SlideApp.populationStatsStream.map(SendPopulationStats),
-              ZStream.succeed[ServerCommand](SendUserId(userId))
-            )
-            .map { s =>
-              val bytes: ByteBuffer = Pickle.intoBytes(s)
-              WebSocketFrame.binary(Chunk.fromArray(bytes.array()))
-            }
-
-        case command =>
-          ZStream.fromZIO(SlideApp.receiveUserCommand(userId, command)).drain
+  final case class Routes(slideApp: SlideApp, config: Config) {
+    def adminSocket: SocketApp[Any] = {
+      pickleSocket { (command: AdminCommand) =>
+        ZStream.fromZIO(slideApp.receiveAdminCommand(command)).drain
       }
     }
 
-    handleCommand
+    def userSocket: SocketApp[Any] = {
+      val userId = UserId.random
+
+      pickleSocket { (command: UserCommand) =>
+        command match {
+          case UserCommand.Subscribe =>
+            ZStream
+              .mergeAllUnbounded()(
+                ZStream.fromZIO(slideApp.userJoined).drain,
+                slideApp.slideStateStream.map(SendSlideState),
+                slideApp.questionStateStream.map(SendQuestionState),
+                slideApp.voteStream.map(SendVotes),
+                slideApp.populationStatsStream.map(SendPopulationStats),
+                ZStream.succeed[ServerCommand](SendUserId(userId))
+              )
+              .map { s =>
+                val bytes: ByteBuffer = Pickle.intoBytes(s)
+                WebSocketFrame.binary(Chunk.fromArray(bytes.array()))
+              }
+
+          case command =>
+            ZStream.fromZIO(slideApp.receiveUserCommand(userId, command)).drain
+        }
+      }.onClose { conn =>
+        // TODO: Fix zio-http onClose method not being called
+        Runtime.default.unsafeRunAsync(
+          ZIO.debug("Closing connection") *>
+            slideApp.userLeft
+        )
+        ZIO.debug(s"ON CLOSE CALLED WITH CONN $conn")
+      }
+
+    }
+
+    val app: HttpApp[Any, Throwable] =
+      Http.collectZIO[Request] {
+        case Method.GET -> !! / "ws" =>
+          Response.fromSocketApp(userSocket)
+
+        case req @ Method.GET -> !! / "ws" / "admin" =>
+          req.url.queryParams.getOrElse("password", List.empty) match {
+            case List(password) if password == config.adminPassword =>
+              Response.fromSocketApp(adminSocket)
+            case _ =>
+              ZIO.succeed(Response.fromHttpError(HttpError.Unauthorized("INVALID PASSWORD")))
+          }
+      }
   }
 
-  private def app(adminPassword: String): HttpApp[SlideApp, Throwable] =
-    Http.collectZIO[Request] {
-      case Method.GET -> !! / "ws" =>
-        Response.fromSocketApp(userSocket)
-
-      case req @ Method.GET -> !! / "ws" / "admin" =>
-        req.url.queryParams.getOrElse("password", List.empty) match {
-          case List(password) if password == adminPassword =>
-            Response.fromSocketApp(adminSocket)
-          case _ =>
-            ZIO.succeed(Response.fromHttpError(HttpError.Unauthorized("INVALID PASSWORD")))
-        }
-    }
+  object Routes {
+    val live = ZLayer.fromFunction(Routes.apply _)
+  }
 
   override val run = (for {
     port <- System.envOrElse("PORT", "8088").map(_.toInt).orElseSucceed(8088)
     _ <- SlideApp.populationStatsStream
       .foreach(stats => Console.printLine(s"CONNECTED USERS ${stats.connectedUsers}"))
       .fork
-    _      <- Console.printLine(s"STARTING SERVER ON PORT $port")
-    config <- ZIO.service[Config]
-    _      <- Server.start(port, app(config.adminPassword))
+    _   <- Console.printLine(s"STARTING SERVER ON PORT $port")
+    app <- ZIO.serviceWith[Routes](_.app)
+    _   <- Server.start(port, app)
   } yield ())
-    .provide(SlideApp.live, Config.live)
-    .exitCode
+    .debug("SERVER COMPLETE")
+    .provide(SlideApp.live, Config.live, Routes.live)
 
   private def pickleSocket[R, E <: Throwable, A: Pickler](f: A => ZStream[R, E, WebSocketFrame]): SocketApp[R] =
     SocketApp(

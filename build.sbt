@@ -2,7 +2,7 @@ name := "zio-slides"
 
 version := "0.1"
 
-val animusVersion    = "0.1.9"
+val animusVersion    = "0.1.12"
 val laminarVersion   = "0.14.2"
 val zioConfigVersion = "3.0.0-RC8"
 val zioHttpVersion   = "2.0.0-RC7"
@@ -21,7 +21,7 @@ inThisBuild(
 val sharedSettings = Seq(
   addCompilerPlugin("org.typelevel" %% "kind-projector"     % "0.13.2" cross CrossVersion.full),
   addCompilerPlugin("com.olegpy"    %% "better-monadic-for" % "0.3.1"),
-  scalacOptions ++= Seq("-Ymacro-annotations", "-Xfatal-warnings", "-Wunused"),
+  scalacOptions ++= Seq("-Ymacro-annotations", "-Xfatal-warnings"),
   resolvers ++= Seq(
     "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots",
     "Sonatype OSS Snapshots s01" at "https://s01.oss.sonatype.org/content/repositories/snapshots"
