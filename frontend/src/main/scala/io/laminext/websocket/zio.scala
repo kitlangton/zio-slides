@@ -22,7 +22,8 @@ object boopickle {
         },
         receiver = { msg =>
           Right(Unpickle[Receive].fromBytes(TypedArrayBuffer.wrap(msg.data.asInstanceOf[ArrayBuffer])))
-        }
+        },
+        protocol = "ws"
       )
   }
 

@@ -6,7 +6,7 @@ import zio.slides.VoteState.{CastVoteId, Topic, Vote, VoteMap}
 import java.util.UUID
 
 case class VoteState private (map: VoteMap) { self =>
-  def processUpdates(votes: Chunk[CastVoteId]): VoteState =
+  def processUpdates(votes: Vector[CastVoteId]): VoteState =
     votes.foldLeft(self)(_.processUpdate(_))
 
   def processUpdate(vote: CastVoteId): VoteState =

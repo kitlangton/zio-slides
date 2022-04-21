@@ -1,23 +1,25 @@
 package zio.slides
 
+import boopickle.Default._
 import com.raquo.laminar.api.L._
 import io.laminext.websocket.WebSocket
 import io.laminext.websocket.boopickle._
-import org.scalajs.dom.ext.LocalStorage
+import org.scalajs.dom.window
 import zio.slides.State.{questionStateVar, slideStateVar}
 import zio.slides.Styles.panelStyles
-import boopickle.Default._
 
 object Admin {
+  lazy val localStoragePassword = scala.util.Try(window.localStorage.getItem("password")).toOption
+
   val adminWs: WebSocket[ServerCommand, AdminCommand] =
     WebSocket
-      .url(Config.webSocketsUrl + s"/admin?password=${LocalStorage("password").getOrElse("")}")
+      .url(Config.webSocketsUrl + s"/admin?password=${localStoragePassword.getOrElse("")}")
       .pickle[ServerCommand, AdminCommand]
       .build(reconnectRetries = 0)
 
   def AdminPanel: Div =
     div(
-      LocalStorage("password").map { _ =>
+      localStoragePassword.map { _ =>
         adminWs.connect
       },
       child.maybe <-- adminWs.isConnected.map {

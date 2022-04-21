@@ -1,32 +1,26 @@
 package zio.slides
 
 import zio._
-import zio.clock.Clock
-import zio.console.{Console, putStrLn}
-import zio.duration._
-import zio.random.Random
-import zio.test.Assertion.equalTo
-import zio.test.environment.Live
 import zio.test._
 
-object SlideAppSpec extends DefaultRunnableSpec {
-  def simulateUser: ZIO[Has[SlideApp] with Random with Console, Nothing, TestResult] = for {
-    _                    <- putStrLn("STARTING")
-    delay                <- random.nextIntBetween(0, 3)
-    amountToTake         <- random.nextIntBetween(2, 5000).delay(delay.seconds).provideSomeLayer[Random](Clock.live)
+object SlideAppSpec extends ZIOSpecDefault {
+  def simulateUser: ZIO[SlideApp with Live, Nothing, TestResult] = Live.live(for {
+    _                    <- Console.printLine("STARTING").orDie
+    delay                <- Random.nextIntBetween(0, 3)
+    amountToTake         <- Random.nextIntBetween(2, 5000).delay(delay.seconds)
     receivedSlideIndices <- SlideApp.slideStateStream.take(amountToTake).runCollect.map(_.map(_.slideIndex))
     expected = Chunk.fromIterable(receivedSlideIndices.min to receivedSlideIndices.max)
-  } yield assert(receivedSlideIndices)(equalTo(expected))
+  } yield assertTrue(receivedSlideIndices == expected))
 
-  def spec: ZSpec[Environment, Failure] =
+  def spec =
     suite("SlideAppSpec")(
-      testM("subscriptions are interruptible") {
-        val total = 1000
+      test("subscriptions are interruptible") {
+        val total = 100
         for {
           _   <- SlideApp.receiveAdminCommand(AdminCommand.NextSlide).forever.fork
           _   <- Live.live(ZIO.sleep(1.seconds))
           ref <- Ref.make(0)
-          reportFinish = ref.getAndUpdate(_ + 1).flatMap(i => putStrLn(s"FINISHED $i / $total"))
+          reportFinish = ref.getAndUpdate(_ + 1).flatMap(i => Console.printLine(s"FINISHED ${i + 1} / $total"))
           all <- ZIO.collectAllPar(List.fill(total)(simulateUser <* reportFinish))
         } yield BoolAlgebra.collectAll(all).getOrElse(assertCompletes.negate)
       }

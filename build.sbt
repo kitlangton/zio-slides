@@ -3,13 +3,23 @@ name := "zio-slides"
 version := "0.1"
 
 val animusVersion    = "0.1.9"
-val laminarVersion   = "0.13.0"
-val zioConfigVersion = "1.0.4"
-val zioHttpVersion   = "1.0.0.0-RC17"
-val zioVersion       = "1.0.12"
+val laminarVersion   = "0.14.2"
+val zioConfigVersion = "3.0.0-RC8"
+val zioHttpVersion   = "2.0.0-RC7"
+val zioVersion       = "2.0.0-RC5"
+
+Global / onChangedBuildSource := ReloadOnSourceChanges
+
+inThisBuild(
+  List(
+    scalaVersion := "2.13.8",
+    semanticdbEnabled := true,
+    semanticdbVersion := scalafixSemanticdb.revision
+  )
+)
 
 val sharedSettings = Seq(
-  addCompilerPlugin("org.typelevel" %% "kind-projector"     % "0.11.3" cross CrossVersion.full),
+  addCompilerPlugin("org.typelevel" %% "kind-projector"     % "0.13.2" cross CrossVersion.full),
   addCompilerPlugin("com.olegpy"    %% "better-monadic-for" % "0.3.1"),
   scalacOptions ++= Seq("-Ymacro-annotations", "-Xfatal-warnings"),
   resolvers ++= Seq(
@@ -22,7 +32,7 @@ val sharedSettings = Seq(
     "dev.zio"      %%% "zio-streams"   % zioVersion,
     "org.scala-lang" % "scala-reflect" % scalaVersion.value % Provided
   ),
-  scalaVersion := "2.13.5"
+  scalaVersion := "2.13.8"
 )
 
 scalacOptions ++= Seq("-Ymacro-annotations", "-Xfatal-warnings")
@@ -34,11 +44,11 @@ lazy val backend = project
     sharedSettings,
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
     libraryDependencies ++= Seq(
-      "io.github.kitlangton" %% "zio-magic"           % "0.2.3",
-      "dev.zio"              %% "zio-config"          % zioConfigVersion,
-      "dev.zio"              %% "zio-config-magnolia" % zioConfigVersion,
-      "dev.zio"              %% "zio-test"            % zioVersion % Test,
-      "io.d11"               %% "zhttp"               % zioHttpVersion
+      "dev.zio" %% "zio-config"          % zioConfigVersion,
+      "dev.zio" %% "zio-config-magnolia" % zioConfigVersion,
+      "dev.zio" %% "zio-test"            % zioVersion % Test,
+      "dev.zio" %% "zio-test-sbt"        % zioVersion % Test,
+      "io.d11"  %% "zhttp"               % zioHttpVersion
     )
   )
   .dependsOn(shared)
@@ -53,8 +63,8 @@ lazy val frontend = project
     libraryDependencies ++= Seq(
       "io.github.kitlangton" %%% "animus"          % animusVersion,
       "com.raquo"            %%% "laminar"         % laminarVersion,
-      "io.github.cquiroz"    %%% "scala-java-time" % "2.2.1",
-      "io.laminext"          %%% "websocket"       % "0.12.2"
+      "io.github.cquiroz"    %%% "scala-java-time" % "2.3.0",
+      "io.laminext"          %%% "websocket"       % "0.14.3"
     )
   )
   .settings(sharedSettings)

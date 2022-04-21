@@ -3,13 +3,13 @@ package zio.slides
 import zio._
 import zio.config._
 import zio.config.magnolia._
+import zio.System
 
 case class Config(adminPassword: String)
 
 object Config {
-  val descriptor: ConfigDescriptor[Config] =
-    DeriveConfigDescriptor.descriptor[Config]
+  val descriptor: _root_.zio.config.ConfigDescriptor[Config] = Descriptor[Config].desc
 
-  val live: ZLayer[system.System, Nothing, Has[Config]] =
-    (ZConfig.fromPropertiesFile("../application.conf", descriptor) orElse ZConfig.fromSystemEnv(descriptor)).orDie
+  val live: ZLayer[Any, Nothing, Config] =
+    ZConfig.fromPropertiesFile("../application.conf", descriptor).orDie
 }
